@@ -30,8 +30,22 @@ app.use(
 );
 
 // ─── CORS ────────────────────────────────────────────────────────────────────
+const allowedOrigins = [
+  'https://lms-frontend.vercel.app',
+  'https://lms-frontend-orcin-nine.vercel.app',
+  ...(process.env.CLIENT_URL ? process.env.CLIENT_URL.split(',').map(o => o.trim()) : [])
+];
+
 app.use(cors({
-  origin: "https://lms-frontend.vercel.app",
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1 || origin.endsWith('.vercel.app')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
 }));
 
