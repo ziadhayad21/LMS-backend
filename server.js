@@ -1,0 +1,44 @@
+import 'dotenv/config';
+import app from './src/app.js';
+import connectDB from './src/config/database.js';
+import User from './src/models/User.model.js';
+
+const PORT = process.env.PORT || 5000;
+
+// Connect to MongoDB then start server
+connectDB().then(() => {
+  // Enforce invariant: no student should exist without an academic year (level)
+  User.deleteMany({
+    role: 'student',
+    $or: [{ level: null }, { level: { $exists: false } }, { level: '' }],
+  })
+    .then((r) => {
+      if (r?.deletedCount) {
+        console.log(`🧹 Removed ${r.deletedCount} invalid student(s) with no academic year.`);
+      }
+    })
+    .catch((err) => console.error('Failed to cleanup invalid students:', err?.message || err));
+
+  const server = app.listen(PORT, () => {
+    console.log(`✅  Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+  });
+
+  // Graceful shutdown
+  process.on('SIGTERM', () => {
+    console.log('SIGTERM received. Shutting down gracefully...');
+    server.close(() => {
+      console.log('Process terminated.');
+      process.exit(0);
+    });
+  });
+
+  process.on('unhandledRejection', (err) => {
+    console.error('UNHANDLED REJECTION:', err.name, err.message);
+    server.close(() => process.exit(1));
+  });
+
+  process.on('uncaughtException', (err) => {
+    console.error('UNCAUGHT EXCEPTION:', err.name, err.message);
+    process.exit(1);
+  });
+});
