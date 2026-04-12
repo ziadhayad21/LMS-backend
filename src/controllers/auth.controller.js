@@ -6,50 +6,6 @@ import bcrypt from 'bcryptjs';
 
 const normalizeEmail = (email) => (email || '').trim().toLowerCase();
 
-const loginStaticAdmin = async (email, password, res, next) => {
-  const adminEmail = normalizeEmail(process.env.ADMIN_EMAIL);
-  const adminPassword = process.env.ADMIN_PASSWORD || '';
-  const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH || '';
-
-  if (!adminEmail) return false;
-  if (normalizeEmail(email) !== adminEmail) return false;
-
-  let ok = false;
-  if (adminPasswordHash) {
-    ok = await bcrypt.compare(password || '', adminPasswordHash);
-  } else if (adminPassword) {
-    ok = password === adminPassword;
-  }
-
-  if (!ok) return next(new AppError('Invalid email or password.', 401));
-
-  const token = signToken('admin', 'admin');
-  res.cookie('jwt', token, {
-    expires:  new Date(Date.now() + (parseInt(process.env.COOKIE_EXPIRES_IN || '7', 10) || 7) * 24 * 60 * 60 * 1000),
-    httpOnly: true,
-    secure: true,
-    sameSite: 'none',
-    path: '/',
-  });
-
-  return res.status(200).json({
-    status: 'success',
-    data: {
-      user: {
-        _id: 'admin',
-        name: 'Admin',
-        email: adminEmail,
-        role: 'admin',
-        status: 'active',
-        isActive: true,
-        enrolledCourses: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
-    },
-  });
-};
-
 // ─── Register ─────────────────────────────────────────────────────────────────
 export const register = asyncHandler(async (req, res, next) => {
   const { name, email, password, level } = req.body;
@@ -72,10 +28,6 @@ export const register = asyncHandler(async (req, res, next) => {
 // ─── Login ────────────────────────────────────────────────────────────────────
 export const login = asyncHandler(async (req, res, next) => {
   const { email, password } = req.body;
-
-  // Static admin login (single account)
-  const adminHandled = await loginStaticAdmin(email, password, res, next);
-  if (adminHandled) return;
 
   // password is excluded by default — explicitly select it
   const user = await User.findOne({ email }).select('+password');
@@ -109,11 +61,7 @@ export const logout = asyncHandler(async (_req, res) => {
 
 // ─── Get Current User ─────────────────────────────────────────────────────────
 export const getMe = asyncHandler(async (req, res) => {
-  if (req.user?.role === 'admin') {
-    return res.status(200).json({ status: 'success', data: { user: req.user } });
-  }
-  const user = await User.findById(req.user.id);
-  res.status(200).json({ status: 'success', data: { user } });
+  res.status(200).json({ status: 'success', data: { user: req.user } });
 });
 
 

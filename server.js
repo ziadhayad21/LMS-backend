@@ -26,6 +26,33 @@ connectDB().then(() => {
       console.error('Failed to cleanup invalid students:', err?.message || err)
     );
 
+  // SEED ADMIN ACCOUNT
+  const seedAdmin = async () => {
+    const adminEmail = (process.env.ADMIN_EMAIL || 'admin@englishpro.com').toLowerCase();
+    const adminPassword = process.env.ADMIN_PASSWORD || 'Admin@123456';
+
+    try {
+      const adminExists = await User.findOne({ email: adminEmail });
+      if (!adminExists) {
+        await User.create({
+          name: 'System Admin',
+          email: adminEmail,
+          password: adminPassword,
+          role: 'admin',
+          status: 'active',
+          isActive: true
+        });
+        console.log(`✅ Default admin account created: ${adminEmail}`);
+      } else {
+        console.log(`ℹ️ Admin account already exists: ${adminEmail}`);
+      }
+    } catch (err) {
+      console.error('❌ Failed to seed admin user:', err.message);
+    }
+  };
+
+  seedAdmin();
+
   // START SERVER (IMPORTANT FOR RAILWAY)
   const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`🚀 Server running in ${process.env.NODE_ENV || "production"} mode on port ${PORT}`);

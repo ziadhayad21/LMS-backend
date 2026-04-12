@@ -26,7 +26,7 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type:    String,
-      enum:    ['student', 'teacher'], // admin is static (not stored in DB)
+      enum:    ['student', 'teacher', 'admin'],
       default: 'student',
     },
     status: {

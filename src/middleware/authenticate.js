@@ -29,24 +29,6 @@ export const authenticate = asyncHandler(async (req, _res, next) => {
     return next(new AppError('Invalid authentication token.', 401));
   }
 
-  // Static admin account (not stored in DB)
-  if (decoded?.role === 'admin' && decoded?.id === 'admin') {
-    const adminEmail = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
-    if (!adminEmail) {
-      return next(new AppError('Admin is not configured.', 500));
-    }
-    req.user = {
-      id: 'admin',
-      _id: 'admin',
-      role: 'admin',
-      status: 'active',
-      name: 'Admin',
-      email: adminEmail,
-      isActive: true,
-    };
-    return next();
-  }
-
   // 3. Confirm user still exists and is active
   const currentUser = await User.findById(decoded.id).select('+passwordChangedAt');
   if (!currentUser || !currentUser.isActive) {
@@ -59,7 +41,7 @@ export const authenticate = asyncHandler(async (req, _res, next) => {
   }
 
   // Grant access — attach full user to request
-  if (!['teacher', 'student'].includes(currentUser.role)) {
+  if (!['teacher', 'student', 'admin'].includes(currentUser.role)) {
     return next(new AppError(`Invalid role "${currentUser.role}".`, 403));
   }
 
