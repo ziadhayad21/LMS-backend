@@ -31,7 +31,7 @@ app.use(
 
 // ─── CORS ────────────────────────────────────────────────────────────────────
 app.use(cors({
-  origin: "https://lms-frontend-orcin-nine.vercel.app",
+  origin: "https://lms-frontend.vercel.app",
   credentials: true
 }));
 

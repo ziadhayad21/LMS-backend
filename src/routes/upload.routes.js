@@ -12,7 +12,7 @@ router.post('/image', uploadImage, (req, res, next) => {
     return next(new AppError('Please provide an image file', 400));
   }
   // Construct the URL path (since the app serves /uploads statically)
-  const imageUrl = `${process.env.API_URL || 'http://localhost:5000'}/uploads/images/${req.file.filename}`;
+  const imageUrl = `${process.env.API_URL || 'https://lms-backend-production-3598.up.railway.app'}/uploads/images/${req.file.filename}`;
   sendSuccess(res, 201, { url: imageUrl });
 });
 
