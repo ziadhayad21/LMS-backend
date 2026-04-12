@@ -3,7 +3,8 @@ import app from './src/app.js';
 import connectDB from './src/config/database.js';
 import User from './src/models/User.model.js';
 
-const PORT = process.env.PORT || 8080;
+// IMPORTANT: Railway provides PORT dynamically
+const PORT = process.env.PORT;
 
 // Connect to MongoDB then start server
 connectDB().then(() => {
@@ -27,7 +28,7 @@ connectDB().then(() => {
 
   // START SERVER (IMPORTANT FOR RAILWAY)
   const server = app.listen(PORT, "0.0.0.0", () => {
-    console.log(`🚀 Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+    console.log(`🚀 Server running in ${process.env.NODE_ENV || "production"} mode on port ${PORT}`);
   });
 
   // Graceful shutdown
