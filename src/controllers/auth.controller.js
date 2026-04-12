@@ -27,9 +27,9 @@ const loginStaticAdmin = async (email, password, res, next) => {
   res.cookie('jwt', token, {
     expires:  new Date(Date.now() + (parseInt(process.env.COOKIE_EXPIRES_IN || '7', 10) || 7) * 24 * 60 * 60 * 1000),
     httpOnly: true,
-    secure:   process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
-    path:     '/',
+    secure: true,
+    sameSite: 'none',
+    path: '/',
   });
 
   return res.status(200).json({
@@ -100,8 +100,9 @@ export const logout = asyncHandler(async (_req, res) => {
   res.cookie('jwt', 'loggedout', {
     expires:  new Date(Date.now() + 5 * 1000),
     httpOnly: true,
-    secure:   process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    secure: true,
+    sameSite: 'none',
+    path: '/',
   });
   res.status(200).json({ status: 'success', message: 'Logged out successfully.' });
 });

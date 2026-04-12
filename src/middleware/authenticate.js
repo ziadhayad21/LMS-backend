@@ -4,13 +4,15 @@ import { AppError } from '../utils/apiResponse.js';
 import asyncHandler from '../utils/asyncHandler.js';
 
 export const authenticate = asyncHandler(async (req, _res, next) => {
-  // 1. Extract token from HTTP-only cookie OR Authorization header
+  console.log('--- Auth Middleware ---');
+  console.log('Incoming cookies:', req.cookies);
+  // 1. Extract token ONLY from HTTP-only cookie
   let token;
   if (req.cookies?.jwt && req.cookies.jwt !== 'loggedout') {
     token = req.cookies.jwt;
-  } else if (req.headers.authorization?.startsWith('Bearer ')) {
-    token = req.headers.authorization.split(' ')[1];
   }
+
+  console.log('Extracted JWT from cookie:', token ? 'yes' : 'no');
 
   if (!token) {
     return next(new AppError('You are not logged in. Please log in to access this resource.', 401));

@@ -22,10 +22,10 @@ export const setCookieAndRespond = (res, user, statusCode = 200) => {
 
   const cookieOptions = {
     expires:  new Date(Date.now() + COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000),
-    httpOnly: true,                                       // XSS protection
-    secure:   process.env.NODE_ENV === 'production',      // HTTPS only in prod
-    sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
-    path:     '/',
+    httpOnly: true,
+    secure: true,
+    sameSite: 'none',
+    path: '/',
   };
 
   res.cookie('jwt', token, cookieOptions);
