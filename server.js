@@ -3,7 +3,7 @@ import app from './src/app.js';
 import connectDB from './src/config/database.js';
 import User from './src/models/User.model.js';
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT;
 
 // Connect to MongoDB then start server
 connectDB().then(() => {
@@ -20,8 +20,11 @@ connectDB().then(() => {
     .catch((err) => console.error('Failed to cleanup invalid students:', err?.message || err));
 
   const server = app.listen(PORT, () => {
-    console.log(`✅  Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
-  });
+const PORT = process.env.PORT;
+
+const server = app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on port ${PORT}`);
+});
 
   // Graceful shutdown
   process.on('SIGTERM', () => {
