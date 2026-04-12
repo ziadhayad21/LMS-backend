@@ -6,8 +6,9 @@ import asyncHandler from '../utils/asyncHandler.js';
 import { PAGINATION } from '../config/constants.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const assertTeacherOwns = (course, userId) => {
-  if (course.teacher.toString() !== userId.toString()) {
+const assertTeacherOwns = (course, user) => {
+  if (user.role === 'admin') return;
+  if (course.teacher.toString() !== user.id.toString()) {
     throw new AppError('You are not the teacher of this course.', 403);
   }
 };
@@ -88,7 +89,7 @@ export const createCourse = asyncHandler(async (req, res) => {
 export const updateCourse = asyncHandler(async (req, res, next) => {
   const course = await Course.findById(req.params.id);
   if (!course) return next(new AppError('Course not found.', 404));
-  assertTeacherOwns(course, req.user.id);
+  assertTeacherOwns(course, req.user);
 
   const updates = { ...req.body };
   if (req.file) updates.thumbnail = req.file.filename;
@@ -108,7 +109,7 @@ export const updateCourse = asyncHandler(async (req, res, next) => {
 export const deleteCourse = asyncHandler(async (req, res, next) => {
   const course = await Course.findById(req.params.id);
   if (!course) return next(new AppError('Course not found.', 404));
-  assertTeacherOwns(course, req.user.id);
+  assertTeacherOwns(course, req.user);
 
   await course.deleteOne();
   sendSuccess(res, 204, {});
@@ -140,7 +141,7 @@ export const enrollInCourse = asyncHandler(async (req, res, next) => {
 export const getCourseStudents = asyncHandler(async (req, res, next) => {
   const course = await Course.findById(req.params.id);
   if (!course) return next(new AppError('Course not found.', 404));
-  assertTeacherOwns(course, req.user.id);
+  assertTeacherOwns(course, req.user);
 
   const progresses = await Progress.find({ course: course._id })
     .populate('student', 'name email lastLogin createdAt')
@@ -153,8 +154,9 @@ export const getCourseStudents = asyncHandler(async (req, res, next) => {
 // ─── GET /teacher/dashboard ───────────────────────────────────────────────────
 export const getTeacherDashboard = asyncHandler(async (req, res) => {
   const teacherId = req.user.id;
+  const filter = req.user.role === 'admin' ? {} : { teacher: teacherId };
 
-  const courses = await Course.find({ teacher: teacherId })
+  const courses = await Course.find(filter)
     .select('title isPublished enrollmentCount createdAt')
     .lean();
 
