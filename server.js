@@ -4,7 +4,7 @@ import connectDB from './src/config/database.js';
 import User from './src/models/User.model.js';
 
 // IMPORTANT: Railway provides PORT dynamically
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 8080;
 
 // Connect to MongoDB then start server
 connectDB().then(() => {
