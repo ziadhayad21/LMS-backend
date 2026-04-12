@@ -7,24 +7,28 @@ const PORT = process.env.PORT;
 
 // Connect to MongoDB then start server
 connectDB().then(() => {
-  // Enforce invariant: no student should exist without an academic year (level)
+  // cleanup invalid students
   User.deleteMany({
     role: 'student',
-    $or: [{ level: null }, { level: { $exists: false } }, { level: '' }],
+    $or: [
+      { level: null },
+      { level: { $exists: false } },
+      { level: '' }
+    ],
   })
     .then((r) => {
       if (r?.deletedCount) {
         console.log(`🧹 Removed ${r.deletedCount} invalid student(s) with no academic year.`);
       }
     })
-    .catch((err) => console.error('Failed to cleanup invalid students:', err?.message || err));
+    .catch((err) =>
+      console.error('Failed to cleanup invalid students:', err?.message || err)
+    );
 
-  const server = app.listen(PORT, () => {
-const PORT = process.env.PORT;
-
-const server = app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on port ${PORT}`);
-});
+  // START SERVER (FIXED)
+  const server = app.listen(PORT, "0.0.0.0", () => {
+    console.log(`🚀 Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+  });
 
   // Graceful shutdown
   process.on('SIGTERM', () => {
