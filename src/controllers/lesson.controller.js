@@ -38,12 +38,12 @@ export const getLessons = asyncHandler(async (req, res, next) => {
   if (!course) return next(new AppError('Course not found.', 404));
 
   const filter = { course: req.params.courseId };
-  
+
   if (req.user?.role === 'student') {
     filter.isPublished = true;
     filter.level = req.user.level; // Only show student's level
   }
-  
+
   const lessons = await Lesson.find(filter).sort({ order: 1 }).lean();
   sendSuccess(res, 200, { lessons });
 });
@@ -52,10 +52,12 @@ export const getLessons = asyncHandler(async (req, res, next) => {
 export const getAllLessons = asyncHandler(async (req, res) => {
   let query = {};
 
-  if (req.user.role === 'teacher') {
+  if (req.user.role === 'admin') {
+    query = {};
+  } else if (req.user.role === 'teacher') {
     query = { teacher: req.user.id };
   } else {
-    query = { 
+    query = {
       isPublished: true,
       level: req.user.level // Only show student's level
     };
@@ -74,10 +76,10 @@ export const getAllLessons = asyncHandler(async (req, res) => {
 // ─── GET /courses/:courseId/lessons/:id ──────────────────────────────────────
 export const getLesson = asyncHandler(async (req, res, next) => {
   const lesson = await Lesson.findOne({
-    _id:    req.params.id,
+    _id: req.params.id,
     course: req.params.courseId,
   }).populate('course', 'title').populate('teacher', 'name');
-  
+
   if (!lesson) return next(new AppError('Lesson not found.', 404));
 
   // Strict Level Check for Students
@@ -108,26 +110,26 @@ export const createLesson = asyncHandler(async (req, res, next) => {
   assertTeacherOwns(course, req.user.id);
 
   const lessonData = {
-    title:       req.body.title,
+    title: req.body.title,
     description: req.body.description,
-    level:       req.body.level,
-    order:       req.body.order,
+    level: req.body.level,
+    order: req.body.order,
 
-    isPreview:   req.body.isPreview,
+    isPreview: req.body.isPreview,
     isPublished: req.body.isPublished,
     transcriptText: req.body.transcriptText,
-    course:      req.params.courseId,
-    teacher:     req.user.id,
+    course: req.params.courseId,
+    teacher: req.user.id,
   };
 
   if (req.files?.video) {
     const video = req.files.video[0];
     lessonData.videoFile = {
-      filename:     video.filename,
+      filename: video.filename,
       originalName: video.originalname,
-      path:         video.path,
-      size:         video.size,
-      mimetype:     video.mimetype,
+      path: video.path,
+      size: video.size,
+      mimetype: video.mimetype,
     };
   } else if (req.body.videoUrl) {
     lessonData.videoUrl = req.body.videoUrl;
@@ -138,11 +140,11 @@ export const createLesson = asyncHandler(async (req, res, next) => {
   if (req.files?.pdf) {
     const pdf = req.files.pdf[0];
     lessonData.pdfFile = {
-      filename:     pdf.filename,
+      filename: pdf.filename,
       originalName: pdf.originalname,
-      path:         pdf.path,
-      size:         pdf.size,
-      mimetype:     pdf.mimetype,
+      path: pdf.path,
+      size: pdf.size,
+      mimetype: pdf.mimetype,
     };
   }
 
@@ -161,26 +163,26 @@ export const createAcademicLesson = asyncHandler(async (req, res, next) => {
 
   // Multer's req.body fields are always strings.
   const lessonData = {
-    title:       req.body.title,
+    title: req.body.title,
     description: req.body.description,
-    level:       req.body.level,
-    order:       parseInt(req.body.order, 10) || 0,
-    isPreview:   req.body.isPreview === 'true' || req.body.isPreview === true,
+    level: req.body.level,
+    order: parseInt(req.body.order, 10) || 0,
+    isPreview: req.body.isPreview === 'true' || req.body.isPreview === true,
     isPublished: req.body.isPublished === 'true' || req.body.isPublished === true,
     transcriptText: req.body.transcriptText,
-    course:      course._id,
-    teacher:     req.user.id,
+    course: course._id,
+    teacher: req.user.id,
   };
 
 
   if (req.files?.video) {
     const video = req.files.video[0];
     lessonData.videoFile = {
-      filename:     video.filename,
+      filename: video.filename,
       originalName: video.originalname,
-      path:         video.path,
-      size:         video.size,
-      mimetype:     video.mimetype,
+      path: video.path,
+      size: video.size,
+      mimetype: video.mimetype,
     };
   } else if (req.body.videoUrl) {
     lessonData.videoUrl = req.body.videoUrl;
@@ -191,11 +193,11 @@ export const createAcademicLesson = asyncHandler(async (req, res, next) => {
   if (req.files?.pdf) {
     const pdf = req.files.pdf[0];
     lessonData.pdfFile = {
-      filename:     pdf.filename,
+      filename: pdf.filename,
       originalName: pdf.originalname,
-      path:         pdf.path,
-      size:         pdf.size,
-      mimetype:     pdf.mimetype,
+      path: pdf.path,
+      size: pdf.size,
+      mimetype: pdf.mimetype,
     };
   }
 
@@ -228,11 +230,11 @@ export const updateLesson = asyncHandler(async (req, res, next) => {
       });
     }
     lesson.videoFile = {
-      filename:     video.filename,
+      filename: video.filename,
       originalName: video.originalname,
-      path:         video.path,
-      size:         video.size,
-      mimetype:     video.mimetype,
+      path: video.path,
+      size: video.size,
+      mimetype: video.mimetype,
     };
     lesson.videoUrl = null; // Clear URL if file is uploaded
   } else if (req.body.videoUrl) {
@@ -249,11 +251,11 @@ export const updateLesson = asyncHandler(async (req, res, next) => {
       });
     }
     lesson.pdfFile = {
-      filename:     pdf.filename,
+      filename: pdf.filename,
       originalName: pdf.originalname,
-      path:         pdf.path,
-      size:         pdf.size,
-      mimetype:     pdf.mimetype,
+      path: pdf.path,
+      size: pdf.size,
+      mimetype: pdf.mimetype,
     };
   }
 
@@ -307,7 +309,7 @@ function totalFromRanges(ranges) {
 // ─── POST /courses/:courseId/lessons/:id/complete ─────────────────────────────
 export const completeLesson = asyncHandler(async (req, res, next) => {
   const {
-    watchTimeSeconds     = 0,
+    watchTimeSeconds = 0,
     totalDurationSeconds = 0,
     // New: array of {start, end} segments the student ACTUALLY played
     // (skipped portions are absent from this list)
@@ -315,8 +317,8 @@ export const completeLesson = asyncHandler(async (req, res, next) => {
   } = req.body;
 
   const lesson = await Lesson.findOne({
-    _id:         req.params.id,
-    course:      req.params.courseId,
+    _id: req.params.id,
+    course: req.params.courseId,
     isPublished: true,
   });
   if (!lesson) return next(new AppError('Lesson not found.', 404));
@@ -338,7 +340,7 @@ export const completeLesson = asyncHandler(async (req, res, next) => {
 
   const progress = await Progress.findOne({
     student: req.user.id,
-    course:  req.params.courseId,
+    course: req.params.courseId,
   });
   if (!progress) return next(new AppError('You are not enrolled in this course.', 403));
 
@@ -348,43 +350,43 @@ export const completeLesson = asyncHandler(async (req, res, next) => {
 
   if (lessonIndex === -1) {
     // ── First time this lesson is touched ──────────────────────────────────
-    const merged            = mergeRanges(incomingRanges);
-    const actualWatched     = totalFromRanges(merged);
+    const merged = mergeRanges(incomingRanges);
+    const actualWatched = totalFromRanges(merged);
     progress.completedLessons.push({
-      lesson:               lesson._id,
-      watchTimeSeconds:     Math.max(watchTimeSeconds, actualWatched),
-      watchedRanges:        merged,
+      lesson: lesson._id,
+      watchTimeSeconds: Math.max(watchTimeSeconds, actualWatched),
+      watchedRanges: merged,
       actualWatchedSeconds: actualWatched,
     });
   } else {
     // ── Merge incoming ranges with previously stored ones ──────────────────
-    const existing       = progress.completedLessons[lessonIndex];
-    const combined       = mergeRanges([...(existing.watchedRanges || []), ...incomingRanges]);
-    const actualWatched  = totalFromRanges(combined);
+    const existing = progress.completedLessons[lessonIndex];
+    const combined = mergeRanges([...(existing.watchedRanges || []), ...incomingRanges]);
+    const actualWatched = totalFromRanges(combined);
 
-    existing.watchedRanges        = combined;
+    existing.watchedRanges = combined;
     existing.actualWatchedSeconds = actualWatched;
     // Keep the legacy watchTimeSeconds as the larger of the two values so
     // old code paths (which only look at watchTimeSeconds) still work.
-    existing.watchTimeSeconds     = Math.max(existing.watchTimeSeconds, watchTimeSeconds, actualWatched);
-    existing.completedAt          = new Date();
+    existing.watchTimeSeconds = Math.max(existing.watchTimeSeconds, watchTimeSeconds, actualWatched);
+    existing.completedAt = new Date();
   }
 
   progress.lastAccessed = new Date();
 
   // Recalculate overall course completion percentage (STRICTLY for student's level)
-  const levelLessons = await Lesson.find({ 
-    course: req.params.courseId, 
-    level: req.user.level, 
-    isPublished: true 
+  const levelLessons = await Lesson.find({
+    course: req.params.courseId,
+    level: req.user.level,
+    isPublished: true
   }).select('_id');
-  
+
   const totalLevelLessons = levelLessons.length;
-  
+
   if (totalLevelLessons > 0) {
     // Count how many of THESE specific lessons the student has in their completedLessons
     const levelLessonIds = levelLessons.map(l => String(l._id));
-    const completedLevelCount = progress.completedLessons.filter(cl => 
+    const completedLevelCount = progress.completedLessons.filter(cl =>
       levelLessonIds.includes(String(cl.lesson))
     ).length;
 
@@ -402,6 +404,6 @@ export const completeLesson = asyncHandler(async (req, res, next) => {
 
   sendSuccess(res, 200, {
     completionPercentage: progress.completionPercentage,
-    isCompleted:          progress.isCompleted,
+    isCompleted: progress.isCompleted,
   });
 });

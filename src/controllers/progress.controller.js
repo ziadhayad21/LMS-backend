@@ -43,7 +43,7 @@ export const getProgressOverview = asyncHandler(async (req, res) => {
 export const getCourseProgress = asyncHandler(async (req, res, next) => {
   const progress = await Progress.findOne({
     student: req.user.id,
-    course:  req.params.courseId,
+    course: req.params.courseId,
   })
     .populate({
       path: 'course',
@@ -69,7 +69,7 @@ export const getCourseProgress = asyncHandler(async (req, res, next) => {
 
   const examResults = await Result.find({
     student: req.user.id,
-    course:  req.params.courseId,
+    course: req.params.courseId,
   })
     .populate('exam', 'title passingScore')
     .sort({ completedAt: -1 })
@@ -85,11 +85,12 @@ export const getStudentProgress = asyncHandler(async (req, res) => {
     throw new AppError('Student not found.', 404);
   }
 
-  const teacherCourses = await Course.find({ teacher: req.user.id })
+  const courseFilter = req.user.role === 'admin' ? {} : { teacher: req.user.id };
+  const teacherCourses = await Course.find(courseFilter)
     .populate('lessons', 'title duration order videoFile')
     .populate('exams', 'title passingScore')
     .lean();
-    
+
   const teacherCourseIds = teacherCourses.map((c) => c._id);
 
   const progresses = await Progress.find({
@@ -107,16 +108,16 @@ export const getStudentProgress = asyncHandler(async (req, res) => {
     .lean();
 
   // ── Build per-video data ──────────────────────────────────────────────────
-  const allVideos  = [];   // Every lesson for enrolled courses
+  const allVideos = [];   // Every lesson for enrolled courses
   const examsTaken = [];
   const missingExams = [];
 
   teacherCourses.forEach((course) => {
     // We now show all courses that have lessons for the student's level, 
     // even if they haven't enrolled yet. This ensures the 0-video bug is fixed.
-    const progress             = progresses.find((p) => String(p.course) === String(course._id));
-    const completedLessonRefs  = progress ? progress.completedLessons || [] : [];
-    const courseResults        = results.filter(
+    const progress = progresses.find((p) => String(p.course) === String(course._id));
+    const completedLessonRefs = progress ? progress.completedLessons || [] : [];
+    const courseResults = results.filter(
       (r) => r.course && String(r.course._id) === String(course._id)
     );
 
@@ -127,13 +128,13 @@ export const getStudentProgress = asyncHandler(async (req, res) => {
 
       // Visibility Rule: Show in tracking if level matches OR if they've already watched it
       const isLevelMatch = lesson.level === studentInfo.level;
-      const hasRecord    = !!watchRecord;
-      
+      const hasRecord = !!watchRecord;
+
       if (!isLevelMatch && !hasRecord) return;
 
       // Prefer actualWatchedSeconds (skip-aware) over legacy watchTimeSeconds
-      const actualWatched  = Number(watchRecord?.actualWatchedSeconds ?? watchRecord?.watchTimeSeconds ?? 0);
-      const totalDuration  = Number(lesson.duration || lesson.videoFile?.duration || 0);
+      const actualWatched = Number(watchRecord?.actualWatchedSeconds ?? watchRecord?.watchTimeSeconds ?? 0);
+      const totalDuration = Number(lesson.duration || lesson.videoFile?.duration || 0);
 
       let watchPercent = 0;
       if (totalDuration > 0) {
@@ -143,16 +144,16 @@ export const getStudentProgress = asyncHandler(async (req, res) => {
       }
 
       allVideos.push({
-        _id:              lesson._id,
-        title:            lesson.title,
-        order:            lesson.order,
-        courseTitle:      course.title,
-        courseId:         course._id,
+        _id: lesson._id,
+        title: lesson.title,
+        order: lesson.order,
+        courseTitle: course.title,
+        courseId: course._id,
         watchPercent,                         // 0-100 skip-aware watch %
-        watchedSeconds:   Math.round(actualWatched),
+        watchedSeconds: Math.round(actualWatched),
         totalDurationSeconds: Math.round(totalDuration),
-        completedAt:      watchRecord?.completedAt ?? null,
-        hasRecord:        !!watchRecord,       // Whether the student opened this lesson
+        completedAt: watchRecord?.completedAt ?? null,
+        hasRecord: !!watchRecord,       // Whether the student opened this lesson
       });
     });
 
@@ -162,11 +163,11 @@ export const getStudentProgress = asyncHandler(async (req, res) => {
       );
       if (taken) {
         examsTaken.push({
-          _id:         taken._id,
-          examTitle:   taken.exam?.title ?? exam.title,
+          _id: taken._id,
+          examTitle: taken.exam?.title ?? exam.title,
           courseTitle: course.title,
-          score:       taken.score,
-          passed:      taken.passed,
+          score: taken.score,
+          passed: taken.passed,
           totalQuestions: taken.totalQuestions,
           correctAnswers: taken.correctAnswers,
           completedAt: taken.completedAt,
@@ -174,8 +175,8 @@ export const getStudentProgress = asyncHandler(async (req, res) => {
         });
       } else {
         missingExams.push({
-          _id:        exam._id,
-          title:      exam.title,
+          _id: exam._id,
+          title: exam.title,
           courseTitle: course.title,
         });
       }
@@ -189,21 +190,21 @@ export const getStudentProgress = asyncHandler(async (req, res) => {
   });
 
   // Bucket videos for backward-compat (teacher UI uses these)
-  const watched      = allVideos.filter((v) => v.hasRecord);
-  const notWatched   = allVideos.filter((v) => !v.hasRecord);
-  const fullyWatched     = watched.filter((v) => v.watchPercent >= 90);
+  const watched = allVideos.filter((v) => v.hasRecord);
+  const notWatched = allVideos.filter((v) => !v.hasRecord);
+  const fullyWatched = watched.filter((v) => v.watchPercent >= 90);
   const partiallyWatched = watched.filter((v) => v.watchPercent < 90);
 
   sendSuccess(res, 200, {
     student: studentInfo,
     videos: {
-      all:               allVideos,          // New: flat list with watchPercent per video
+      all: allVideos,          // New: flat list with watchPercent per video
       fullyWatched,
       partiallyWatched,
       notWatched,
     },
     exams: {
-      taken:   examsTaken,
+      taken: examsTaken,
       missing: missingExams,
     },
   });
@@ -211,13 +212,15 @@ export const getStudentProgress = asyncHandler(async (req, res) => {
 
 // ─── GET /progress/tracking  (teacher) ─────────────────────────────────────────
 export const getTrackingOverview = asyncHandler(async (req, res) => {
-  const teacherCourses = await Course.find({ teacher: req.user.id })
+  const courseFilter = req.user.role === 'admin' ? {} : { teacher: req.user.id };
+  const teacherCourses = await Course.find(courseFilter)
     .select('_id lessons level title')
     .lean();
   const teacherCourseIds = teacherCourses.map((c) => c._id);
 
   // Levels the teacher actually teaches (used to scope visible students)
-  const teacherLessonLevels = await Lesson.distinct('level', { teacher: req.user.id });
+  const lessonFilter = req.user.role === 'admin' ? {} : { teacher: req.user.id };
+  const teacherLessonLevels = await Lesson.distinct('level', lessonFilter);
   const allowedLevels = Array.from(
     new Set([
       ...teacherCourses.map((c) => c.level).filter(Boolean),
@@ -227,10 +230,10 @@ export const getTrackingOverview = asyncHandler(async (req, res) => {
 
   // 1. Find all students matching the teacher's levels
   let studentQuery = {
-    role:   'student',
+    role: 'student',
     status: 'active',
   };
-  
+
   // 2. Also find students who have active progress in any of this teacher's courses
   const studentsWithProgress = await Progress.find({ course: { $in: teacherCourseIds } })
     .distinct('student')
@@ -254,7 +257,7 @@ export const getTrackingOverview = asyncHandler(async (req, res) => {
   const studentIds = students.map((s) => s._id);
 
   // Only track progress for courses owned by this teacher (privacy + correctness)
-    const progresses = await Progress.find({
+  const progresses = await Progress.find({
     course: { $in: teacherCourseIds },
     ...(studentIds.length ? { student: { $in: studentIds } } : {}),
   })
@@ -278,7 +281,7 @@ export const getTrackingOverview = asyncHandler(async (req, res) => {
   }, {});
 
   const lessonsByLevel = await Lesson.aggregate([
-    { $match: { teacher: req.user._id, isPublished: true } },
+    { $match: { ...(req.user.role === 'admin' ? {} : { teacher: req.user._id }), isPublished: true } },
     { $group: { _id: '$level', count: { $sum: 1 } } },
   ]);
   const lessonCountByLevel = lessonsByLevel.reduce((acc, row) => {
@@ -288,7 +291,7 @@ export const getTrackingOverview = asyncHandler(async (req, res) => {
 
   const tracking = students.map((student) => {
     const studentProgresses = progresses.filter((p) => String(p.student) === String(student._id));
-    
+
     let totalCompleted = 0;
     let totalLessons = lessonCountByLevel[student.level] || 0;
     let lastAccessed = null;
@@ -302,7 +305,7 @@ export const getTrackingOverview = asyncHandler(async (req, res) => {
 
       totalCompleted += validProgressLessons.length;
       totalWatchTimeSeconds += validProgressLessons.reduce((acc, cl) => acc + (cl.actualWatchedSeconds || cl.watchTimeSeconds || 0), 0);
-      
+
       if (!lastAccessed || new Date(p.lastAccessed) > new Date(lastAccessed)) lastAccessed = p.lastAccessed;
     });
 
