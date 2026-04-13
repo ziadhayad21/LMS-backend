@@ -15,10 +15,22 @@ export const createExamValidator = [
     .notEmpty().withMessage('Each question must have text'),
 
   body('questions.*.options')
-    .isArray({ min: 2 }).withMessage('Each question must have at least 2 options'),
+    .if((value, { req, path }) => {
+      const index = path.match(/\d+/)[0];
+      return req.body.questions[index].type === 'multiple-choice';
+    })
+    .isArray({ min: 2 }).withMessage('Multiple choice questions must have at least 2 options'),
 
   body('questions.*.correctOptionIndex')
-    .isInt({ min: 0 }).withMessage('correctOptionIndex must be a non-negative integer'),
+    .if((value, { req, path }) => {
+      const index = path.match(/\d+/)[0];
+      return req.body.questions[index].type === 'multiple-choice';
+    })
+    .isInt({ min: 0 }).withMessage('Multiple choice questions must have a correct option index'),
+
+  body('questions.*.essayAnswer')
+    .optional()
+    .isString(),
 
   body('questions.*.points')
     .optional()
@@ -47,7 +59,12 @@ export const submitExamValidator = [
     .notEmpty().withMessage('Each answer must include a questionId'),
 
   body('answers.*.selectedOptionIndex')
-    .isInt({ min: -1 }).withMessage('selectedOptionIndex must be an integer (-1 = skipped)'),
+    .optional()
+    .isInt({ min: -1 }),
+
+  body('answers.*.essayAnswer')
+    .optional()
+    .isString(),
 
   body('timeTakenSeconds')
     .optional()

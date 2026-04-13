@@ -15,7 +15,7 @@ const assertTeacherOwns = (course, user) => {
 
 // ─── GET /courses ─────────────────────────────────────────────────────────────
 export const getCourses = asyncHandler(async (req, res) => {
-  const page  = Math.max(1, parseInt(req.query.page,  10) || PAGINATION.DEFAULT_PAGE);
+  const page = Math.max(1, parseInt(req.query.page, 10) || PAGINATION.DEFAULT_PAGE);
   const limit = Math.min(
     parseInt(req.query.limit, 10) || PAGINATION.DEFAULT_LIMIT,
     PAGINATION.MAX_LIMIT
@@ -23,13 +23,31 @@ export const getCourses = asyncHandler(async (req, res) => {
   const skip = (page - 1) * limit;
 
   // Build filter
-  const filter = { isPublished: true };
-  
-  // Strict Level Filtering for Students
+  const filter = {};
+
   if (req.user?.role === 'student') {
+    filter.isPublished = true;
     filter.level = req.user.level;
-  } else if (req.query.level) {
-    filter.level = req.query.level;
+  } else if (req.user?.role === 'teacher') {
+    // Teachers see all published or their own drafts
+    filter.$or = [
+      { isPublished: true },
+      { teacher: req.user.id }
+    ];
+  } else if (req.user?.role === 'admin') {
+    // Admins see everything
+  } else {
+    // Public/unauth
+    filter.isPublished = true;
+  }
+
+  if (req.query.level) {
+    if (filter.$or) {
+      // If we have an $or, we need to intersect it
+      filter.level = req.query.level;
+    } else {
+      filter.level = req.query.level;
+    }
   }
 
   if (req.query.category) filter.category = req.query.category;
@@ -54,7 +72,7 @@ export const getCourses = asyncHandler(async (req, res) => {
 // ─── GET /courses/:id ─────────────────────────────────────────────────────────
 export const getCourse = asyncHandler(async (req, res, next) => {
   const query = { _id: req.params.id, isPublished: true };
-  
+
   // Strict Level Filtering for Students
   if (req.user?.role === 'student') {
     query.level = req.user.level;
@@ -65,11 +83,16 @@ export const getCourse = asyncHandler(async (req, res, next) => {
     lessonMatch.level = req.user.level;
   }
 
+  const examMatch = { isPublished: true };
+  if (req.user?.role === 'student') {
+    examMatch.level = req.user.level;
+  }
+
   const course = await Course.findOne(query)
     .populate('teacher', 'name avatarUrl')
-    .populate({ path: 'lessons',   match: lessonMatch, select: '-videoFile.path' })
+    .populate({ path: 'lessons', match: lessonMatch, select: '-videoFile.path' })
     .populate({ path: 'materials', match: { isPublished: true } })
-    .populate({ path: 'exams',     match: { isPublished: true }, select: 'title description timeLimit passingScore maxAttempts' });
+    .populate({ path: 'exams', match: examMatch, select: 'title description timeLimit passingScore maxAttempts' });
 
   if (!course) return next(new AppError('Course not found or unavailable for your level.', 404));
   sendSuccess(res, 200, { course });
@@ -98,8 +121,8 @@ export const updateCourse = asyncHandler(async (req, res, next) => {
   delete updates.teacher;
 
   const updated = await Course.findByIdAndUpdate(req.params.id, updates, {
-    new:              true,
-    runValidators:    true,
+    new: true,
+    runValidators: true,
   });
 
   sendSuccess(res, 200, { course: updated });
@@ -163,7 +186,7 @@ export const getTeacherDashboard = asyncHandler(async (req, res) => {
   const totalStudents = courses.reduce((sum, c) => sum + c.enrollmentCount, 0);
 
   sendSuccess(res, 200, {
-    totalCourses:    courses.length,
+    totalCourses: courses.length,
     publishedCourses: courses.filter((c) => c.isPublished).length,
     totalStudents,
     courses,
