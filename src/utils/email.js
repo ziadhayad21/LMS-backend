@@ -18,6 +18,8 @@ const getTransport = () => {
     port: Number(SMTP_PORT),
     secure: SMTP_SECURE === 'true' || Number(SMTP_PORT) === 465,
     auth: { user: SMTP_USER, pass: SMTP_PASS },
+    connectionTimeout: 10000, // 10 seconds
+    greetingTimeout: 10000,
   });
 };
 
@@ -33,6 +35,13 @@ export const sendEmail = async ({ to, subject, html, text }) => {
   }
 
   const from = process.env.FROM_EMAIL || process.env.SMTP_USER;
-  await transport.sendMail({ from, to, subject, html, text });
+  try {
+    await transport.sendMail({ from, to, subject, html, text });
+    // eslint-disable-next-line no-console
+    console.log(`[email] Successfully sent to ${to}`);
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error(`[email] Failed to send email to ${to}:`, error.message);
+  }
 };
 

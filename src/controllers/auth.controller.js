@@ -140,13 +140,17 @@ export const forgotPassword = asyncHandler(async (req, res, next) => {
     isActive: true,
   });
 
-  // Always return success to avoid account enumeration
   if (!user) {
+    // eslint-disable-next-line no-console
+    console.warn(`[auth] Password reset requested for non-existent user: ${identifier}`);
     return res.status(200).json({
       status: 'success',
       message: 'If an account exists, a reset link has been sent to the associated email.',
     });
   }
+
+  // eslint-disable-next-line no-console
+  console.log(`[auth] User found for reset: ${user.email}. Sending email...`);
 
   const resetToken = crypto.randomBytes(32).toString('hex');
   const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
@@ -159,7 +163,8 @@ export const forgotPassword = asyncHandler(async (req, res, next) => {
   const resetUrl = `${clientUrl.replace(/\/$/, '')}/reset-password/${resetToken}`;
 
   if (user.email) {
-    await sendEmail({
+    // Send in background - do not await here to prevent request hanging
+    sendEmail({
       to: user.email,
       subject: 'Password Reset Request',
       text: `Click this link to reset your password (valid for 1 hour): ${resetUrl}`,
@@ -179,7 +184,10 @@ export const forgotPassword = asyncHandler(async (req, res, next) => {
           </div>
         </div>
       `,
-    });
+    }).catch(err => console.error('[email-bg-error]', err));
+    
+    // eslint-disable-next-line no-console
+    console.log(`[auth] Email sending initiated in background for: ${user.email}`);
   }
 
   res.status(200).json({
