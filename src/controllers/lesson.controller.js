@@ -6,8 +6,10 @@ import User from '../models/User.model.js';
 import { AppError, sendSuccess } from '../utils/apiResponse.js';
 import asyncHandler from '../utils/asyncHandler.js';
 
-const assertTeacherOwns = (course, userId) => {
-  if (course.teacher.toString() !== userId.toString()) {
+const assertTeacherOwns = (course, user) => {
+  if (user.role === 'admin') return;
+  const uid = user._id || user;
+  if (course.teacher.toString() !== uid.toString()) {
     throw new AppError('You are not the teacher of this course.', 403);
   }
 };
@@ -37,11 +39,18 @@ export const getLessons = asyncHandler(async (req, res, next) => {
   const course = await Course.findById(req.params.courseId);
   if (!course) return next(new AppError('Course not found.', 404));
 
+  // STRICT: Students cannot access lessons from a course outside their level
+  if (req.user?.role === 'student') {
+    if (!req.user.level || course.level !== req.user.level) {
+      return sendSuccess(res, 200, { lessons: [] });
+    }
+  }
+
   const filter = { course: req.params.courseId };
 
   if (req.user?.role === 'student') {
     filter.isPublished = true;
-    filter.level = req.user.level; // Only show student's level
+    filter.level = req.user.level; // exact level match on lesson too
   }
 
   const lessons = await Lesson.find(filter).sort({ order: 1 }).lean();
@@ -57,9 +66,11 @@ export const getAllLessons = asyncHandler(async (req, res) => {
   } else if (req.user.role === 'teacher') {
     query = { teacher: req.user.id };
   } else {
+    // STRICT: Students see ONLY published lessons at their exact level
+    if (!req.user.level) return sendSuccess(res, 200, { lessons: [] });
     query = {
       isPublished: true,
-      level: req.user.level // Only show student's level
+      level: req.user.level, // exact match only
     };
   }
 
@@ -107,7 +118,7 @@ export const getLesson = asyncHandler(async (req, res, next) => {
 export const createLesson = asyncHandler(async (req, res, next) => {
   const course = await Course.findById(req.params.courseId);
   if (!course) return next(new AppError('Course not found.', 404));
-  assertTeacherOwns(course, req.user.id);
+  assertTeacherOwns(course, req.user);
 
   const lessonData = {
     title: req.body.title,
@@ -213,7 +224,7 @@ export const updateLesson = asyncHandler(async (req, res, next) => {
   if (!lesson) return next(new AppError('Lesson not found.', 404));
 
   const course = await Course.findById(req.params.courseId);
-  assertTeacherOwns(course, req.user.id);
+  assertTeacherOwns(course, req.user);
 
   // Update core fields
   const allowedUpdates = ['title', 'description', 'order', 'isPreview', 'isPublished', 'transcriptText'];
@@ -270,7 +281,7 @@ export const deleteLesson = asyncHandler(async (req, res, next) => {
   if (!lesson) return next(new AppError('Lesson not found.', 404));
 
   const course = await Course.findById(req.params.courseId);
-  assertTeacherOwns(course, req.user.id);
+  assertTeacherOwns(course, req.user);
 
   if (lesson.videoFile?.path) {
     fs.unlink(lesson.videoFile.path, (err) => {

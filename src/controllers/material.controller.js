@@ -5,8 +5,10 @@ import Progress from '../models/Progress.model.js';
 import { AppError, sendSuccess } from '../utils/apiResponse.js';
 import asyncHandler from '../utils/asyncHandler.js';
 
-const assertTeacherOwns = (course, userId) => {
-  if (course.teacher.toString() !== userId.toString()) {
+const assertTeacherOwns = (course, user) => {
+  if (user.role === 'admin') return;
+  const uid = user._id || user;
+  if (course.teacher.toString() !== uid.toString()) {
     throw new AppError('You are not the teacher of this course.', 403);
   }
 };
@@ -16,11 +18,18 @@ export const getMaterials = asyncHandler(async (req, res, next) => {
   const course = await Course.findById(req.params.courseId);
   if (!course) return next(new AppError('Course not found.', 404));
 
+  // STRICT: Students can only access materials from courses matching their level
+  if (req.user?.role === 'student') {
+    if (!req.user.level || course.level !== req.user.level) {
+      return sendSuccess(res, 200, { materials: [] });
+    }
+  }
+
   const filter = { course: req.params.courseId };
-  if (req.user?.role !== 'teacher') filter.isPublished = true;
+  if (req.user?.role !== 'teacher' && req.user?.role !== 'admin') filter.isPublished = true;
 
   const materials = await Material.find(filter)
-    .select('-file.path')  // Don't expose server-side file path
+    .select('-file.path')
     .sort({ createdAt: -1 })
     .lean();
 
@@ -33,20 +42,20 @@ export const uploadMaterial = asyncHandler(async (req, res, next) => {
 
   const course = await Course.findById(req.params.courseId);
   if (!course) return next(new AppError('Course not found.', 404));
-  assertTeacherOwns(course, req.user.id);
+  assertTeacherOwns(course, req.user);
 
   const material = await Material.create({
-    title:       req.body.title || req.file.originalname,
+    title: req.body.title || req.file.originalname,
     description: req.body.description,
-    course:      req.params.courseId,
-    teacher:     req.user.id,
-    type:        'pdf',
+    course: req.params.courseId,
+    teacher: req.user.id,
+    type: 'pdf',
     file: {
-      filename:     req.file.filename,
+      filename: req.file.filename,
       originalName: req.file.originalname,
-      path:         req.file.path,
-      size:         req.file.size,
-      mimetype:     req.file.mimetype,
+      path: req.file.path,
+      size: req.file.size,
+      mimetype: req.file.mimetype,
     },
   });
 
@@ -60,17 +69,17 @@ export const uploadMaterial = asyncHandler(async (req, res, next) => {
 // ─── GET /courses/:courseId/materials/:id  (download) ────────────────────────
 export const downloadMaterial = asyncHandler(async (req, res, next) => {
   const material = await Material.findOne({
-    _id:    req.params.id,
+    _id: req.params.id,
     course: req.params.courseId,
   });
   if (!material || !material.isPublished) return next(new AppError('Material not found.', 404));
 
-  // Confirm student is enrolled
   if (req.user.role === 'student') {
-    const enrolled = req.user.enrolledCourses?.some(
-      (c) => c.toString() === req.params.courseId
-    );
-    if (!enrolled) return next(new AppError('You must be enrolled to download materials.', 403));
+    // STRICT: Check the course level matches the student's level
+    const course = await Course.findById(req.params.courseId).select('level').lean();
+    if (!course || !req.user.level || course.level !== req.user.level) {
+      return next(new AppError('This material is not available for your academic level.', 403));
+    }
 
     // Track download in progress
     await Progress.findOneAndUpdate(
@@ -87,13 +96,13 @@ export const downloadMaterial = asyncHandler(async (req, res, next) => {
 // ─── DELETE /courses/:courseId/materials/:id ─────────────────────────────────
 export const deleteMaterial = asyncHandler(async (req, res, next) => {
   const material = await Material.findOne({
-    _id:    req.params.id,
+    _id: req.params.id,
     course: req.params.courseId,
   });
   if (!material) return next(new AppError('Material not found.', 404));
 
   const course = await Course.findById(req.params.courseId);
-  assertTeacherOwns(course, req.user.id);
+  assertTeacherOwns(course, req.user);
 
   fs.unlink(material.file.path, (err) => {
     if (err) console.warn('Could not delete file:', err.message);

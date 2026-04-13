@@ -85,6 +85,7 @@ export const getCourse = asyncHandler(async (req, res, next) => {
 
   const examMatch = { isPublished: true };
   if (req.user?.role === 'student') {
+    // STRICT: Students see only exams whose level exactly matches theirs
     examMatch.level = req.user.level;
   }
 

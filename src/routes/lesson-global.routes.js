@@ -1,24 +1,17 @@
 import { Router } from 'express';
-import {
-  getAllLessons,
-  createAcademicLesson,
-} from '../controllers/lesson.controller.js';
+import { getAllLessons } from '../controllers/lesson.controller.js';
 import { authenticate } from '../middleware/authenticate.js';
-import { authorize } from '../middleware/authorize.js';
 import { requireActiveStudent } from '../middleware/requireActiveStudent.js';
-import { uploadLessonFiles } from '../middleware/upload.js';
-import { createLessonValidator } from '../validators/course.validator.js';
 
 const router = Router();
 
 router.use(authenticate);
+
+// GET /lessons — list lessons (students get filtered by level, teachers get their own)
 router.get('/', requireActiveStudent, getAllLessons);
-router.post(
-  '/',
-  authorize('teacher'),
-  uploadLessonFiles,
-  createLessonValidator,
-  createAcademicLesson
-);
+
+// NOTE: POST /lessons is intentionally removed.
+// Lessons MUST be created through POST /courses/:courseId/lessons
+// to enforce the course-first relationship.
 
 export default router;

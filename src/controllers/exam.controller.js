@@ -4,7 +4,9 @@ import Result from '../models/Result.model.js';
 import { AppError, sendSuccess } from '../utils/apiResponse.js';
 import asyncHandler from '../utils/asyncHandler.js';
 
-const assertTeacherOwns = (course, userId) => {
+const assertTeacherOwns = (course, user) => {
+  if (user.role === 'admin') return;
+  const userId = user._id || user;
   if (course.teacher.toString() !== userId.toString()) {
     throw new AppError('You are not the teacher of this course.', 403);
   }
@@ -15,12 +17,22 @@ export const getExams = asyncHandler(async (req, res, next) => {
   const course = await Course.findById(req.params.courseId);
   if (!course) return next(new AppError('Course not found.', 404));
 
-  const filter = { course: req.params.courseId };
-  if (req.user.role !== 'teacher') filter.isPublished = true;
+  // Students: block access if course level doesn't match theirs
+  if (req.user.role === 'student' && course.level !== req.user.level) {
+    return sendSuccess(res, 200, { exams: [] });
+  }
 
-  // Students: select only safe fields; teachers: include question count
+  const filter = { course: req.params.courseId };
+  if (req.user.role === 'student') {
+    filter.isPublished = true;
+    filter.level = req.user.level; // strict level match
+  } else if (req.user.role !== 'teacher' && req.user.role !== 'admin') {
+    filter.isPublished = true;
+  }
+
+  // Students: select only safe fields; teachers/admins: include question count
   const select =
-    req.user.role === 'teacher'
+    req.user.role === 'teacher' || req.user.role === 'admin'
       ? 'title description timeLimit passingScore maxAttempts isPublished createdAt questions'
       : 'title description timeLimit passingScore maxAttempts';
 
@@ -40,24 +52,25 @@ export const getGlobalExams = asyncHandler(async (req, res) => {
   let filter = {};
 
   if (req.user.role === 'teacher') {
+    // Teachers see only their own exams
     filter.teacher = req.user.id;
+  } else if (req.user.role === 'admin') {
+    // Admins see everything — no extra filter
   } else if (req.user.role === 'student') {
-    // Current behavior: show exams of enrolled courses
-    // New behavior: show exams of enrolled courses OR exams matching student level
+    // STRICT: Only exams whose level exactly matches the student's assigned academic level
+    if (!req.user.level) return sendSuccess(res, 200, { exams: [] });
+
     filter = {
-      $or: [
-        { course: { $in: req.user.enrolledCourses } },
-        { level: req.user.level }
-      ],
-      isPublished: true
+      level: req.user.level,  // exact match only — no $or, no fallback
+      isPublished: true,
     };
   }
 
-  // Students: select only safe fields; teachers: include question count
+  // Students: select only safe fields; teachers/admins: include question count
   const select =
-    req.user.role === 'teacher'
-      ? 'title description course level timeLimit passingScore maxAttempts isPublished createdAt questions'
-      : 'title description course level timeLimit passingScore maxAttempts';
+    req.user.role === 'student'
+      ? 'title description course level timeLimit passingScore maxAttempts'
+      : 'title description course level timeLimit passingScore maxAttempts isPublished createdAt questions';
 
   const exams = await Exam.find(filter).select(select).populate('course', 'title').lean();
 
@@ -75,11 +88,17 @@ export const getGlobalExams = asyncHandler(async (req, res) => {
 export const getExam = asyncHandler(async (req, res, next) => {
   const exam = await Exam.findById(req.params.id).lean();
 
-
   if (!exam) return next(new AppError('Exam not found.', 404));
 
-  if (!exam.isPublished && req.user.role !== 'teacher') {
+  if (!exam.isPublished && req.user.role !== 'teacher' && req.user.role !== 'admin') {
     return next(new AppError('This exam is not available.', 403));
+  }
+
+  // STRICT: Students can only access exams that exactly match their level
+  if (req.user.role === 'student') {
+    if (!req.user.level || exam.level !== req.user.level) {
+      return next(new AppError('This exam is not available for your academic level.', 403));
+    }
   }
 
   // Check availability window
@@ -103,7 +122,7 @@ export const getExam = asyncHandler(async (req, res, next) => {
   // Attach student's attempt count
   const attemptCount = await Result.countDocuments({
     student: req.user.id,
-    exam:    exam._id,
+    exam: exam._id,
   });
 
   sendSuccess(res, 200, { exam, attemptCount });
@@ -115,7 +134,7 @@ export const getExamFull = asyncHandler(async (req, res, next) => {
   if (!exam) return next(new AppError('Exam not found.', 404));
 
   const course = await Course.findById(req.params.courseId);
-  assertTeacherOwns(course, req.user.id);
+  assertTeacherOwns(course, req.user);
 
   sendSuccess(res, 200, { exam });
 });
@@ -124,16 +143,20 @@ export const getExamFull = asyncHandler(async (req, res, next) => {
 export const createExam = asyncHandler(async (req, res, next) => {
   const { courseId } = req.params;
   let course = null;
+  let level = req.body.level;
 
   if (courseId) {
     course = await Course.findById(courseId);
     if (!course) return next(new AppError('Course not found.', 404));
-    assertTeacherOwns(course, req.user.id);
+    assertTeacherOwns(course, req.user);
+    // Inherit level from course if not explicitly provided
+    if (!level) level = course.level;
   }
 
   const examData = {
     ...req.body,
-    course:  courseId || null,
+    level,
+    course: courseId || null,
     teacher: req.user.id,
   };
 
@@ -153,7 +176,7 @@ export const updateExam = asyncHandler(async (req, res, next) => {
   if (!exam) return next(new AppError('Exam not found.', 404));
 
   const course = await Course.findById(req.params.courseId);
-  assertTeacherOwns(course, req.user.id);
+  assertTeacherOwns(course, req.user);
 
   const updates = { ...req.body };
   delete updates.teacher;
@@ -172,7 +195,7 @@ export const deleteExam = asyncHandler(async (req, res, next) => {
   if (!exam) return next(new AppError('Exam not found.', 404));
 
   const course = await Course.findById(req.params.courseId);
-  assertTeacherOwns(course, req.user.id);
+  assertTeacherOwns(course, req.user);
 
   await Promise.all([
     exam.deleteOne(),
@@ -187,14 +210,21 @@ export const submitExam = asyncHandler(async (req, res, next) => {
   const { answers, timeTakenSeconds = 0 } = req.body;
 
   const exam = await Exam.findOne({
-    _id:         req.params.examId,
+    _id: req.params.examId,
     isPublished: true,
   }).lean();
 
   if (!exam) return next(new AppError('Exam not found or not available.', 404));
 
+  // STRICT: Students can only submit exams that match their academic level
+  if (req.user.role === 'student') {
+    if (!req.user.level || exam.level !== req.user.level) {
+      return next(new AppError('This exam is not available for your academic level.', 403));
+    }
+  }
+
   // Grading
-  let totalPoints  = 0;
+  let totalPoints = 0;
   let earnedPoints = 0;
   let correctCount = 0;
 
@@ -207,14 +237,14 @@ export const submitExam = asyncHandler(async (req, res, next) => {
 
     if (question.type === 'essay') {
       return {
-        questionId:   question._id,
-        essayAnswer:  studentAnswer?.essayAnswer || '',
-        isCorrect:    false, // Essays not auto-graded
+        questionId: question._id,
+        essayAnswer: studentAnswer?.essayAnswer || '',
+        isCorrect: false, // Essays not auto-graded
         pointsEarned: 0,
       };
     }
 
-    const selected  = studentAnswer?.selectedOptionIndex ?? -1;
+    const selected = studentAnswer?.selectedOptionIndex ?? -1;
     const isCorrect = selected === question.correctOptionIndex;
 
     if (isCorrect) {
@@ -223,48 +253,48 @@ export const submitExam = asyncHandler(async (req, res, next) => {
     }
 
     return {
-      questionId:          question._id,
+      questionId: question._id,
       selectedOptionIndex: selected,
       isCorrect,
-      pointsEarned:        isCorrect ? (question.points || 0) : 0,
+      pointsEarned: isCorrect ? (question.points || 0) : 0,
     };
   });
 
 
-  const score  = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
+  const score = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
   const passed = score >= exam.passingScore;
 
   const prevAttempts = await Result.countDocuments({
     student: req.user.id,
-    exam:    exam._id,
+    exam: exam._id,
   });
 
   const result = await Result.create({
-    student:          req.user.id,
-    exam:             exam._id,
-    course:           exam.course,
-    answers:          gradedAnswers,
+    student: req.user.id,
+    exam: exam._id,
+    course: exam.course,
+    answers: gradedAnswers,
     score,
     totalPoints,
     earnedPoints,
-    totalQuestions:   exam.questions.length,
-    correctAnswers:   correctCount,
+    totalQuestions: exam.questions.length,
+    correctAnswers: correctCount,
     passed,
     timeTakenSeconds,
-    attemptNumber:    prevAttempts + 1,
+    attemptNumber: prevAttempts + 1,
   });
 
   sendSuccess(res, 201, {
     result: {
-      _id:            result._id,
+      _id: result._id,
       score,
       passed,
       correctAnswers: correctCount,
       totalQuestions: exam.questions.length,
       earnedPoints,
       totalPoints,
-      attemptNumber:  prevAttempts + 1,
-      passingScore:   exam.passingScore,
+      attemptNumber: prevAttempts + 1,
+      passingScore: exam.passingScore,
     },
   });
 });
