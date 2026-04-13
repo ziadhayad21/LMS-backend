@@ -57,6 +57,10 @@ connectDB().then(() => {
           admin.role = 'admin';
           admin.status = 'active';
           admin.isActive = true;
+          // Ensure they have a phone number if missing (legacy accounts)
+          if (!admin.phone) {
+            admin.phone = email === 'ziad1@gmail.com' ? '01011111111' : '01000000000';
+          }
           // We don't change the password for existing ones unless it's the default system admin
           if (email !== 'ziad1@gmail.com') {
              admin.password = defaultPassword;
