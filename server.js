@@ -30,25 +30,31 @@ connectDB().then(() => {
   const seedAdmin = async () => {
     try {
       const adminEmail = (process.env.ADMIN_EMAIL || 'admin@englishpro.com').toLowerCase();
-      const adminPassword = process.env.ADMIN_PASSWORD || 'Admin@123456';
+      const adminPassword = (process.env.ADMIN_PASSWORD || 'Admin@123456');
       
-      const adminData = {
-        name: 'System Admin',
-        email: adminEmail,
-        password: adminPassword,
-        role: 'admin',
-        status: 'active',
-        isActive: true
-      };
-
-      // Force update if exists, otherwise create
-      const admin = await User.findOneAndUpdate(
-        { email: adminEmail },
-        adminData,
-        { upsert: true, new: true, runValidators: true }
-      );
+      let admin = await User.findOne({ email: adminEmail });
       
-      console.log(`✅ Admin account ensured: ${admin.email} (Role: ${admin.role})`);
+      if (!admin) {
+        admin = new User({
+          name: 'System Admin',
+          email: adminEmail,
+          password: adminPassword,
+          role: 'admin',
+          status: 'active',
+          isActive: true
+        });
+        await admin.save();
+        console.log(`✅ Admin account created: ${adminEmail}`);
+      } else {
+        // Force role and status update if they changed, and re-save to ensure password hash if needed
+        admin.role = 'admin';
+        admin.status = 'active';
+        admin.isActive = true;
+        // Only update password if provided and different (bcrypt handles comparison if we wanted, but here we just reset it to be sure)
+        admin.password = adminPassword;
+        await admin.save();
+        console.log(`✅ Admin account verified & updated: ${adminEmail}`);
+      }
     } catch (err) {
       console.error('❌ Failed to seed admin user:', err.message);
     }
