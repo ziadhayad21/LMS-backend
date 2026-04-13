@@ -29,31 +29,40 @@ connectDB().then(() => {
   // SEED ADMIN ACCOUNT
   const seedAdmin = async () => {
     try {
-      const adminEmail = (process.env.ADMIN_EMAIL || 'admin@englishpro.com').toLowerCase();
-      const adminPassword = (process.env.ADMIN_PASSWORD || 'Admin@123456');
+      // List of emails that should ALWAYS be admins
+      const adminEmails = [
+        (process.env.ADMIN_EMAIL || 'admin@englishpro.com').toLowerCase(),
+        'ziad1@gmail.com'
+      ];
       
-      let admin = await User.findOne({ email: adminEmail });
-      
-      if (!admin) {
-        admin = new User({
-          name: 'System Admin',
-          email: adminEmail,
-          password: adminPassword,
-          role: 'admin',
-          status: 'active',
-          isActive: true
-        });
-        await admin.save();
-        console.log(`✅ Admin account created: ${adminEmail}`);
-      } else {
-        // Force role and status update if they changed, and re-save to ensure password hash if needed
-        admin.role = 'admin';
-        admin.status = 'active';
-        admin.isActive = true;
-        // Only update password if provided and different (bcrypt handles comparison if we wanted, but here we just reset it to be sure)
-        admin.password = adminPassword;
-        await admin.save();
-        console.log(`✅ Admin account verified & updated: ${adminEmail}`);
+      const defaultPassword = process.env.ADMIN_PASSWORD || 'Admin@123456';
+
+      for (const email of adminEmails) {
+        let admin = await User.findOne({ email });
+        
+        if (!admin) {
+          admin = new User({
+            name: email === 'ziad1@gmail.com' ? 'Ziad Admin' : 'System Admin',
+            email: email,
+            password: defaultPassword,
+            role: 'admin',
+            status: 'active',
+            isActive: true
+          });
+          await admin.save();
+          console.log(`✅ Admin account created: ${email}`);
+        } else {
+          // Force elevation to admin
+          admin.role = 'admin';
+          admin.status = 'active';
+          admin.isActive = true;
+          // We don't change the password for existing ones unless it's the default system admin
+          if (email !== 'ziad1@gmail.com') {
+             admin.password = defaultPassword;
+          }
+          await admin.save();
+          console.log(`✅ Admin permissions verified for: ${email}`);
+        }
       }
     } catch (err) {
       console.error('❌ Failed to seed admin user:', err.message);
