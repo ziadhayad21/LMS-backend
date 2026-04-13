@@ -163,31 +163,42 @@ export const forgotPassword = asyncHandler(async (req, res, next) => {
   const resetUrl = `${clientUrl.replace(/\/$/, '')}/reset-password/${resetToken}`;
 
   if (user.email) {
-    // Send in background - do not await here to prevent request hanging
-    sendEmail({
-      to: user.email,
-      subject: 'Password Reset Request',
-      text: `Click this link to reset your password (valid for 1 hour): ${resetUrl}`,
-      html: `
-        <div style="font-family: sans-serif; padding: 40px; background-color: #f8fafc; border-radius: 16px;">
-          <div style="max-width: 500px; margin: 0 auto; background: white; padding: 32px; border-radius: 20px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
-            <h1 style="color: #0f172a; font-size: 24px; margin-bottom: 16px;">Reset Your Password</h1>
-            <p style="color: #475569; font-size: 16px; line-height: 1.5;">We received a request to reset your password. Click the button below to choose a new one.</p>
-            <div style="margin: 32px 0;">
-              <a href="${resetUrl}" style="background-color: #4f46e5; color: white; padding: 14px 28px; border-radius: 12px; text-decoration: none; font-weight: 600; display: inline-block;">
-                Reset Password
-              </a>
+    try {
+      await sendEmail({
+        to: user.email,
+        subject: 'Password Reset Request',
+        text: `Click this link to reset your password (valid for 1 hour): ${resetUrl}`,
+        html: `
+          <div style="font-family: sans-serif; padding: 40px; background-color: #f8fafc; border-radius: 16px;">
+            <div style="max-width: 500px; margin: 0 auto; background: white; padding: 32px; border-radius: 20px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
+              <h1 style="color: #0f172a; font-size: 24px; margin-bottom: 16px;">Reset Your Password</h1>
+              <p style="color: #475569; font-size: 16px; line-height: 1.5;">We received a request to reset your password. Click the button below to choose a new one.</p>
+              <div style="margin: 32px 0;">
+                <a href="${resetUrl}" style="background-color: #4f46e5; color: white; padding: 14px 28px; border-radius: 12px; text-decoration: none; font-weight: 600; display: inline-block;">
+                  Reset Password
+                </a>
+              </div>
+              <p style="color: #94a3b8; font-size: 14px;">This link will expire in 1 hour. If you didn't request this, you can safely ignore this email.</p>
+              <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 32px 0;">
+              <p style="color: #94a3b8; font-size: 12px; margin-top: 32px;">If the button doesn't work, copy and paste this link: <br> <span style="color: #6366f1;">${resetUrl}</span></p>
             </div>
-            <p style="color: #94a3b8; font-size: 14px;">This link will expire in 1 hour. If you didn't request this, you can safely ignore this email.</p>
-            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 32px 0;">
-            <p style="color: #94a3b8; font-size: 12px; margin-top: 32px;">If the button doesn't work, copy and paste this link: <br> <span style="color: #6366f1;">${resetUrl}</span></p>
           </div>
-        </div>
-      `,
-    }).catch(err => console.error('[email-bg-error]', err));
-    
-    // eslint-disable-next-line no-console
-    console.log(`[auth] Email sending initiated in background for: ${user.email}`);
+        `,
+      });
+
+      
+      return res.status(200).json({
+        status: 'success',
+        message: `A reset link has been sent to ${user.email}.`,
+      });
+    } catch (err) {
+      console.error('[email-error]', err);
+      return res.status(500).json({
+        status: 'error',
+        message: 'Could not send email. Please check server logs or SMTP settings.',
+        debug: err.message
+      });
+    }
   }
 
   res.status(200).json({

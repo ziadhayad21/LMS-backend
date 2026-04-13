@@ -16,12 +16,13 @@ const getTransport = () => {
   return nodemailer.createTransport({
     host: SMTP_HOST || 'smtp.gmail.com',
     port: Number(SMTP_PORT) || 587,
-    secure: Number(SMTP_PORT) === 465, // Only true for 465, false for 587
+    secure: Number(SMTP_PORT) === 465,
     auth: { user: SMTP_USER, pass: SMTP_PASS },
     tls: {
-      rejectUnauthorized: false, // Helps with some cloud hosting certificate issues
+      rejectUnauthorized: false,
     },
     connectionTimeout: 10000,
+    family: 4, // Force IPv4 to avoid ENETUNREACH on IPv6-only cloud networks
   });
 };
 
