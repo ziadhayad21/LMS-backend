@@ -1,4 +1,15 @@
 import nodemailer from 'nodemailer';
+import dns from 'dns';
+
+// Many cloud environments have no IPv6 route; Gmail SMTP can resolve to IPv6.
+// Force IPv4-first to avoid ENETUNREACH on IPv6 addresses.
+try {
+  if (typeof dns.setDefaultResultOrder === 'function') {
+    dns.setDefaultResultOrder('ipv4first');
+  }
+} catch {
+  // ignore
+}
 
 const getTransport = () => {
   const {
@@ -14,9 +25,9 @@ const getTransport = () => {
   }
 
   return nodemailer.createTransport({
-    host: 'smtp.gmail.com', // Use direct host
-    port: 587,
-    secure: false, // Must be false for 587/STARTTLS
+    host: SMTP_HOST,
+    port: Number(SMTP_PORT),
+    secure: SMTP_SECURE === 'true' || Number(SMTP_PORT) === 465,
     auth: { user: SMTP_USER, pass: SMTP_PASS },
     tls: {
       rejectUnauthorized: false,
@@ -24,7 +35,6 @@ const getTransport = () => {
     },
     connectionTimeout: 20000, // Increase to 20 seconds for slow cloud networks
     socketTimeout: 20000,
-    family: 4,
   });
 };
 
@@ -46,7 +56,10 @@ export const sendEmail = async ({ to, subject, html, text }) => {
     console.log(`[email] Successfully sent to ${to}`);
   } catch (error) {
     // eslint-disable-next-line no-console
-    console.error(`[email] Failed to send email to ${to}:`, error.message);
+    console.error(`[email] Failed to send email to ${to}:`, error?.message || error);
+    // Keep caller flows resilient; upstream can still decide what to do,
+    // but by default we don't crash auth flows due to SMTP/network issues.
+    return;
   }
 };
 

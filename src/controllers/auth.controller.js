@@ -4,7 +4,6 @@ import { AppError } from '../utils/apiResponse.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import crypto from 'crypto';
 import { sendEmail } from '../utils/email.js';
-import { sendSMS } from '../utils/sms.js';
 
 const normalizeEmail = (email) => (email || '').trim().toLowerCase();
 const normalizePhone = (phone) => String(phone || '').replace(/\s+/g, '').trim();
@@ -130,7 +129,7 @@ export const updatePassword = asyncHandler(async (req, res, next) => {
 });
 
 // ─── Forgot / Reset Password ──────────────────────────────────────────────────
-export const forgotPassword = asyncHandler(async (req, res, next) => {
+export const forgotPassword = asyncHandler(async (req, res) => {
   const identifier = String(req.body.identifier || '').trim();
   const normalizedEmail = normalizeEmail(identifier);
   const normalizedPhone = normalizePhone(identifier);
@@ -189,14 +188,16 @@ export const forgotPassword = asyncHandler(async (req, res, next) => {
       
       return res.status(200).json({
         status: 'success',
-        message: `A reset link has been sent to ${user.email}.`,
+        message: 'If an account exists, a reset link has been sent to the associated email.',
       });
     } catch (err) {
-      console.error('[email-error]', err);
-      return res.status(500).json({
-        status: 'error',
-        message: 'Could not send email. Please check server logs or SMTP settings.',
-        debug: err.message
+      // Don't reveal delivery errors to the client; avoid breaking UX.
+      // Log for ops and still return a generic success response.
+      // eslint-disable-next-line no-console
+      console.error('[email-error]', err?.message || err);
+      return res.status(200).json({
+        status: 'success',
+        message: 'If an account exists, a reset link has been sent to the associated email.',
       });
     }
   }
