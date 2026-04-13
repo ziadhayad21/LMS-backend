@@ -151,62 +151,56 @@ export const forgotPassword = asyncHandler(async (req, res) => {
   // eslint-disable-next-line no-console
   console.log(`[auth] User found for reset: ${user.email}. Sending email...`);
 
-  const resetToken = crypto.randomBytes(32).toString('hex');
-  const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+  // Generate 6-digit OTP
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const hashedOtp = crypto.createHash('sha256').update(otp).digest('hex');
 
-  user.passwordResetToken = hashedToken;
-  user.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+  user.passwordResetToken = hashedOtp;
+  user.passwordResetExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
   await user.save({ validateBeforeSave: false });
 
-  const clientUrl = (process.env.CLIENT_URL || 'http://localhost:3000').split(',')[0].trim();
-  const resetUrl = `${clientUrl.replace(/\/$/, '')}/reset-password/${resetToken}`;
+  // eslint-disable-next-line no-console
+  console.log('------------------------------------------');
+  console.log(`PASS RESET OTP FOR [${identifier}]: ${otp}`);
+  console.log('------------------------------------------');
 
   if (user.email) {
     try {
       await sendEmail({
         to: user.email,
-        subject: 'Password Reset Request',
-        text: `Click this link to reset your password (valid for 1 hour): ${resetUrl}`,
+        subject: 'Your Password Reset Code',
+        text: `Your password reset code is: ${otp}`,
         html: `
           <div style="font-family: sans-serif; padding: 40px; background-color: #f8fafc; border-radius: 16px;">
-            <div style="max-width: 500px; margin: 0 auto; background: white; padding: 32px; border-radius: 20px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
+            <div style="max-width: 500px; margin: 0 auto; background: white; padding: 32px; border-radius: 20px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); text-align: center;">
               <h1 style="color: #0f172a; font-size: 24px; margin-bottom: 16px;">Reset Your Password</h1>
-              <p style="color: #475569; font-size: 16px; line-height: 1.5;">We received a request to reset your password. Click the button below to choose a new one.</p>
+              <p style="color: #475569; font-size: 16px; line-height: 1.5;">Please use the verification code below to reset your password.</p>
               <div style="margin: 32px 0;">
-                <a href="${resetUrl}" style="background-color: #4f46e5; color: white; padding: 14px 28px; border-radius: 12px; text-decoration: none; font-weight: 600; display: inline-block;">
-                  Reset Password
-                </a>
+                <span style="background-color: #f1f5f9; color: #4f46e5; padding: 14px 28px; border-radius: 12px; font-size: 32px; font-weight: bold; letter-spacing: 4px; display: inline-block;">
+                  ${otp}
+                </span>
               </div>
-              <p style="color: #94a3b8; font-size: 14px;">This link will expire in 1 hour. If you didn't request this, you can safely ignore this email.</p>
-              <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 32px 0;">
-              <p style="color: #94a3b8; font-size: 12px; margin-top: 32px;">If the button doesn't work, copy and paste this link: <br> <span style="color: #6366f1;">${resetUrl}</span></p>
+              <p style="color: #94a3b8; font-size: 14px;">This code is valid for 10 minutes.</p>
             </div>
           </div>
         `,
       });
-
       
       return res.status(200).json({
         status: 'success',
-        message: 'If an account exists, a reset link has been sent to the associated email.',
+        message: 'If an account exists, a reset code has been sent.',
       });
     } catch (err) {
-      // Don't reveal delivery errors to the client; avoid breaking UX.
-      // Log for ops and still return a generic success response.
-      // eslint-disable-next-line no-console
       console.error('[email-error]', err?.message || err);
-      return res.status(200).json({
-        status: 'success',
-        message: 'If an account exists, a reset link has been sent to the associated email.',
-      });
     }
   }
 
   res.status(200).json({
     status: 'success',
-    message: 'If an account exists, a reset link has been sent to the associated email.',
+    message: 'If an account exists, a reset code has been sent.',
   });
 });
+
 
 export const verifyResetOtp = asyncHandler(async (req, res, next) => {
   const { identifier, otp, newPassword } = req.body;

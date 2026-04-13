@@ -5,43 +5,37 @@ import dns from 'dns';
 import axios from 'axios';
 
 export const sendEmail = async ({ to, subject, html, text }) => {
-  const apiKey = process.env.SMTP_PASS; // We use the same API Key field
-  const senderEmail = process.env.SMTP_USER || 'hyadz0211@gmail.com';
-
-  if (!apiKey) {
-    // eslint-disable-next-line no-console
-    console.warn('[email] API Key missing. Email not sent.');
-    return;
-  }
+  const scriptUrl = process.env.GOOGLE_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbydP0foLYBcBZhjXVEKB1Spi6ycVYybL7i-7-BZ8bNquiwOViGivfER6ydJga6uirxkxg/exec';
 
   try {
     const response = await axios.post(
-      'https://api.brevo.com/v3/smtp/email',
+      scriptUrl,
       {
-        sender: { email: senderEmail, name: 'English LMS' },
-        to: [{ email: to }],
+        to: to,
         subject: subject,
-        htmlContent: html,
-        textContent: text || '',
+        html: html,
+        text: text || '',
       },
       {
         headers: {
-          'api-key': apiKey,
           'Content-Type': 'application/json',
         },
       }
     );
 
-    if (response.status === 201 || response.status === 200) {
+    if (response.data?.status === 'success' || response.status === 200) {
       // eslint-disable-next-line no-console
-      console.log(`[email-api] Successfully sent to ${to}`);
+      console.log(`[email-gas] Successfully sent to ${to} via Google Apps Script`);
+    } else {
+      console.error('[email-gas] Unexpected response from script:', response.data);
     }
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error(
-      `[email-api] Failed to send to ${to}:`,
-      error.response?.data?.message || error.message
+      `[email-gas] Failed to send to ${to}:`,
+      error.message
     );
     throw error;
   }
 };
+
