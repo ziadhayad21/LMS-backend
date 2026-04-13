@@ -14,12 +14,14 @@ const getTransport = () => {
   }
 
   return nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: Number(SMTP_PORT),
-    secure: SMTP_SECURE === 'true' || Number(SMTP_PORT) === 465,
+    host: SMTP_HOST || 'smtp.gmail.com',
+    port: Number(SMTP_PORT) || 587,
+    secure: Number(SMTP_PORT) === 465, // Only true for 465, false for 587
     auth: { user: SMTP_USER, pass: SMTP_PASS },
-    connectionTimeout: 10000, // 10 seconds
-    greetingTimeout: 10000,
+    tls: {
+      rejectUnauthorized: false, // Helps with some cloud hosting certificate issues
+    },
+    connectionTimeout: 10000,
   });
 };
 
