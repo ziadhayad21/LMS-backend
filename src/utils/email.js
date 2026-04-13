@@ -14,15 +14,17 @@ const getTransport = () => {
   }
 
   return nodemailer.createTransport({
-    host: SMTP_HOST || 'smtp.gmail.com',
-    port: Number(SMTP_PORT) || 587,
-    secure: Number(SMTP_PORT) === 465,
+    host: 'smtp.gmail.com', // Use direct host
+    port: 587,
+    secure: false, // Must be false for 587/STARTTLS
     auth: { user: SMTP_USER, pass: SMTP_PASS },
     tls: {
       rejectUnauthorized: false,
+      minVersion: 'TLSv1.2'
     },
-    connectionTimeout: 10000,
-    family: 4, // Force IPv4 to avoid ENETUNREACH on IPv6-only cloud networks
+    connectionTimeout: 20000, // Increase to 20 seconds for slow cloud networks
+    socketTimeout: 20000,
+    family: 4,
   });
 };
 
