@@ -155,6 +155,11 @@ export const forgotPassword = asyncHandler(async (req, res, next) => {
   user.passwordResetExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
   await user.save({ validateBeforeSave: false });
 
+  // ALWAYS log the OTP for development/debugging purposes
+  console.log('------------------------------------------');
+  console.log(`PASS RESET OTP FOR [${identifier}]: ${otp}`);
+  console.log('------------------------------------------');
+
   // In a real app, send actual SMS if it was a phone. 
   // For now, we use email if available, or just respond (mocking SMS).
   if (user.email) {
