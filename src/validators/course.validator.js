@@ -23,7 +23,10 @@ export const createCourseValidator = [
 
   body('tags')
     .optional()
-    .isArray().withMessage('Tags must be an array'),
+    .customSanitizer((value) => {
+      if (typeof value === 'string') return [value];
+      return Array.isArray(value) ? value : [];
+    }),
 
   validate,
 ];

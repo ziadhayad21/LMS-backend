@@ -71,22 +71,39 @@ export const getCourses = asyncHandler(async (req, res) => {
 
 // ─── GET /courses/:id ─────────────────────────────────────────────────────────
 export const getCourse = asyncHandler(async (req, res, next) => {
-  const query = { _id: req.params.id, isPublished: true };
+  const query = { _id: req.params.id };
 
-  // Strict Level Filtering for Students
+  // Role-based visibility logic
   if (req.user?.role === 'student') {
+    query.isPublished = true;
     query.level = req.user.level;
+  } else if (req.user?.role === 'teacher') {
+    // Teacher sees it if it's published OR they are the owner
+    query.$or = [
+      { isPublished: true },
+      { teacher: req.user.id }
+    ];
+  } else if (req.user?.role === 'admin') {
+    // Admin bypasses all visibility filters
+  } else {
+    // Public access
+    query.isPublished = true;
   }
 
-  const lessonMatch = { isPublished: true };
+  const lessonMatch = {};
   if (req.user?.role === 'student') {
+    lessonMatch.isPublished = true;
     lessonMatch.level = req.user.level;
+  } else if (!req.user || req.user.role === 'public') {
+    lessonMatch.isPublished = true;
   }
 
-  const examMatch = { isPublished: true };
+  const examMatch = {};
   if (req.user?.role === 'student') {
-    // STRICT: Students see only exams whose level exactly matches theirs
+    examMatch.isPublished = true;
     examMatch.level = req.user.level;
+  } else if (!req.user || req.user.role === 'public') {
+    examMatch.isPublished = true;
   }
 
   const course = await Course.findOne(query)
