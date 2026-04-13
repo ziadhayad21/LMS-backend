@@ -14,25 +14,6 @@ const assertTeacherOwns = (course, user) => {
   }
 };
 
-const getOrCreateTeacherAcademyCourse = async (teacherId) => {
-  let course = await Course.findOne({
-    teacher: teacherId,
-    title: 'Academic English Academy Lessons',
-  });
-
-  if (!course) {
-    course = await Course.create({
-      title: 'Academic English Academy Lessons',
-      description: 'Core academic English lessons for grammar, reading, and exam preparation.',
-      level: 'intermediate',
-      category: 'general',
-      isPublished: true,
-      teacher: teacherId,
-    });
-  }
-
-  return course;
-};
 
 // ─── GET /courses/:courseId/lessons ──────────────────────────────────────────
 export const getLessons = asyncHandler(async (req, res, next) => {
@@ -168,55 +149,6 @@ export const createLesson = asyncHandler(async (req, res, next) => {
   sendSuccess(res, 201, { lesson });
 });
 
-// ─── POST /lessons (teacher only, lesson-first flow) ─────────────────────────
-export const createAcademicLesson = asyncHandler(async (req, res, next) => {
-  const course = await getOrCreateTeacherAcademyCourse(req.user.id);
-
-  // Multer's req.body fields are always strings.
-  const lessonData = {
-    title: req.body.title,
-    description: req.body.description,
-    level: req.body.level,
-    order: parseInt(req.body.order, 10) || 0,
-    isPreview: req.body.isPreview === 'true' || req.body.isPreview === true,
-    isPublished: req.body.isPublished === 'true' || req.body.isPublished === true,
-    transcriptText: req.body.transcriptText,
-    course: course._id,
-    teacher: req.user.id,
-  };
-
-
-  if (req.files?.video) {
-    const video = req.files.video[0];
-    lessonData.videoFile = {
-      filename: video.filename,
-      originalName: video.originalname,
-      path: video.path,
-      size: video.size,
-      mimetype: video.mimetype,
-    };
-  } else if (req.body.videoUrl) {
-    lessonData.videoUrl = req.body.videoUrl;
-  } else {
-    return next(new AppError('No video file or URL provided.', 400));
-  }
-
-  if (req.files?.pdf) {
-    const pdf = req.files.pdf[0];
-    lessonData.pdfFile = {
-      filename: pdf.filename,
-      originalName: pdf.originalname,
-      path: pdf.path,
-      size: pdf.size,
-      mimetype: pdf.mimetype,
-    };
-  }
-
-  const lesson = await Lesson.create(lessonData);
-  await Course.findByIdAndUpdate(course._id, { $push: { lessons: lesson._id } });
-
-  sendSuccess(res, 201, { lesson });
-});
 
 // ─── PATCH /courses/:courseId/lessons/:id ────────────────────────────────────
 export const updateLesson = asyncHandler(async (req, res, next) => {
