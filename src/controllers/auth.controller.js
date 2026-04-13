@@ -6,17 +6,28 @@ import crypto from 'crypto';
 import { sendEmail } from '../utils/email.js';
 
 const normalizeEmail = (email) => (email || '').trim().toLowerCase();
+const normalizePhone = (phone) => String(phone || '').replace(/\s+/g, '').trim();
 
 // ─── Register ─────────────────────────────────────────────────────────────────
 export const register = asyncHandler(async (req, res, next) => {
-  const { name, email, password, level } = req.body;
+  const { name, email, phone, password, level } = req.body;
+  const normalizedEmail = normalizeEmail(email);
+  const normalizedPhone = normalizePhone(phone);
 
-  const exists = await User.findOne({ email });
-  if (exists) return next(new AppError('An account with that email already exists.', 409));
+  const exists = await User.findOne({
+    $or: [{ email: normalizedEmail }, { phone: normalizedPhone }],
+  }).lean();
+  if (exists?.email === normalizedEmail) {
+    return next(new AppError('An account with that email already exists.', 409));
+  }
+  if (exists?.phone === normalizedPhone) {
+    return next(new AppError('An account with that phone number already exists.', 409));
+  }
 
   const user = await User.create({
     name,
-    email,
+    email: normalizedEmail,
+    phone: normalizedPhone,
     password,
     level,
     role: 'student',
@@ -28,10 +39,18 @@ export const register = asyncHandler(async (req, res, next) => {
 
 // ─── Login ────────────────────────────────────────────────────────────────────
 export const login = asyncHandler(async (req, res, next) => {
-  const { email, password } = req.body;
+  // Accept either { identifier } or legacy { email } as the login field
+  const identifierRaw = req.body.identifier ?? req.body.email;
+  const password = req.body.password;
+
+  const identifier = String(identifierRaw || '').trim();
+  const normalizedEmail = normalizeEmail(identifier);
+  const normalizedPhone = normalizePhone(identifier);
 
   // password is excluded by default — explicitly select it
-  const user = await User.findOne({ email }).select('+password');
+  const user = await User.findOne({
+    $or: [{ email: normalizedEmail }, { phone: normalizedPhone }],
+  }).select('+password');
 
   if (!user || !user.isActive) {
     return next(new AppError('Invalid email or password.', 401));

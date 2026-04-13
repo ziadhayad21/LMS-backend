@@ -18,6 +18,13 @@ const userSchema = new mongoose.Schema(
       trim:      true,
       match:     [/^\S+@\S+\.\S+$/, 'Please enter a valid email address'],
     },
+    phone: {
+      type:     String,
+      required: [true, 'Phone number is required'],
+      unique:   true,
+      trim:     true,
+      match:    [/^01[0125]\d{8}$/, 'Please enter a valid Egyptian phone number (e.g. 01XXXXXXXXX)'],
+    },
     password: {
       type:      String,
       required:  [true, 'Password is required'],
@@ -58,6 +65,11 @@ const userSchema = new mongoose.Schema(
     passwordChangedAt:  Date,
     passwordResetToken: String,
     passwordResetExpires: Date,
+
+    // Future-ready phone verification fields (OTP)
+    phoneVerified: { type: Boolean, default: false },
+    phoneVerificationToken: String, // store hashed token/code
+    phoneVerificationExpires: Date,
   },
   {
     timestamps: true,
@@ -68,6 +80,7 @@ const userSchema = new mongoose.Schema(
 
 // ─── Indexes ─────────────────────────────────────────────────────────────────
 userSchema.index({ role: 1, status: 1, isActive: 1 });
+userSchema.index({ phone: 1 }, { unique: true });
 
 // ─── Virtuals ─────────────────────────────────────────────────────────────────
 userSchema.virtual('avatarUrl').get(function () {

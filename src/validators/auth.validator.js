@@ -22,6 +22,11 @@ export const registerValidator = [
     .isEmail().withMessage('Please provide a valid email address')
     .normalizeEmail(),
 
+  body('phone')
+    .trim()
+    .notEmpty().withMessage('Phone number is required')
+    .matches(/^01[0125]\d{8}$/).withMessage('Please provide a valid Egyptian phone number (e.g. 01XXXXXXXXX)'),
+
   body('level')
     .notEmpty().withMessage('يرجى اختيار السنة الدراسية')
     .isIn([
@@ -44,10 +49,17 @@ export const registerValidator = [
 ];
 
 export const loginValidator = [
-  body('email')
-    .trim()
-    .isEmail().withMessage('Please provide a valid email address')
-    .normalizeEmail(),
+  body('identifier')
+    .custom((value, { req }) => {
+      const v = String(value || req.body.email || '').trim();
+      if (!v) throw new Error('Email or phone is required.');
+      const isEmail = /^\S+@\S+\.\S+$/.test(v);
+      const isEgPhone = /^01[0125]\d{8}$/.test(v.replace(/\s+/g, ''));
+      if (!isEmail && !isEgPhone) {
+        throw new Error('Please provide a valid email or Egyptian phone number.');
+      }
+      return true;
+    }),
 
   body('password')
     .notEmpty().withMessage('Password is required'),
