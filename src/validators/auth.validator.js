@@ -85,10 +85,28 @@ export const updateStudentStatusValidator = [
 ];
 
 export const forgotPasswordValidator = [
-  body('email')
+  body('identifier')
+    .custom((value, { req }) => {
+      const v = String(value || req.body.email || '').trim();
+      if (!v) throw new Error('Email or phone number is required.');
+      const isEmail = /^\S+@\S+\.\S+$/.test(v);
+      const isPhone = /^01[0125]\d{8}$/.test(v.replace(/\s+/g, ''));
+      if (!isEmail && !isPhone) throw new Error('Please provide a valid email or Egyptian phone number.');
+      return true;
+    }),
+  validate,
+];
+
+export const verifyResetOtpValidator = [
+  body('identifier').notEmpty().withMessage('Identifier is required'),
+  body('otp')
     .trim()
-    .isEmail().withMessage('Please provide a valid email address')
-    .normalizeEmail(),
+    .matches(/^\d{6}$/).withMessage('OTP must be a 6-digit number'),
+  body('newPassword')
+    .isLength({ min: 8 }).withMessage('New password must be at least 8 characters')
+    .matches(/[A-Z]/).withMessage('New password must contain an uppercase letter')
+    .matches(/[a-z]/).withMessage('New password must contain a lowercase letter')
+    .matches(/\d/).withMessage('New password must contain a number'),
   validate,
 ];
 

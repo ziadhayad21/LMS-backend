@@ -129,44 +129,82 @@ export const updatePassword = asyncHandler(async (req, res, next) => {
 });
 
 // ─── Forgot / Reset Password ──────────────────────────────────────────────────
-export const forgotPassword = asyncHandler(async (req, res) => {
-  const email = normalizeEmail(req.body.email);
+export const forgotPassword = asyncHandler(async (req, res, next) => {
+  const identifier = String(req.body.identifier || '').trim();
+  const normalizedEmail = normalizeEmail(identifier);
+  const normalizedPhone = normalizePhone(identifier);
 
-  const user = await User.findOne({ email, isActive: true });
+  const user = await User.findOne({
+    $or: [{ email: normalizedEmail }, { phone: normalizedPhone }],
+    isActive: true,
+  });
 
   // Always return success to avoid account enumeration
   if (!user) {
     return res.status(200).json({
       status: 'success',
-      message: 'If that email exists, a reset link has been sent.',
+      message: 'If an account exists, a reset code has been sent.',
     });
   }
 
-  const resetToken = crypto.randomBytes(32).toString('hex');
-  const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+  // Generate 6-digit OTP
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const hashedOtp = crypto.createHash('sha256').update(otp).digest('hex');
 
-  user.passwordResetToken = hashedToken;
-  user.passwordResetExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+  user.passwordResetToken = hashedOtp;
+  user.passwordResetExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
   await user.save({ validateBeforeSave: false });
 
-  const clientUrl = (process.env.CLIENT_URL || 'https://lms-frontend.vercel.app').split(',')[0].trim();
-  const resetUrl = `${clientUrl.replace(/\/$/, '')}/reset-password/${resetToken}`;
-
-  await sendEmail({
-    to: user.email,
-    subject: 'Password reset',
-    text: `Reset your password using this link (valid for 15 minutes): ${resetUrl}`,
-    html: `
-      <p>You requested a password reset.</p>
-      <p><a href="${resetUrl}">Click here to reset your password</a></p>
-      <p>This link is valid for 15 minutes.</p>
-    `,
-  });
+  // In a real app, send actual SMS if it was a phone. 
+  // For now, we use email if available, or just respond (mocking SMS).
+  if (user.email) {
+    await sendEmail({
+      to: user.email,
+      subject: 'Password Reset Code',
+      text: `Your password reset code is: ${otp}. It is valid for 10 minutes.`,
+      html: `
+        <div style="font-family: sans-serif; padding: 20px; color: #334155;">
+          <h2 style="color: #0f172a;">Password Reset Code</h2>
+          <p>Use the following code to reset your password:</p>
+          <div style="font-size: 32px; font-weight: bold; letter-spacing: 4px; padding: 12px; background: #f1f5f9; border-radius: 8px; display: inline-block; margin: 16px 0;">
+            ${otp}
+          </div>
+          <p style="font-size: 14px; color: #64748b;">This code is valid for 10 minutes.</p>
+        </div>
+      `,
+    });
+  }
 
   res.status(200).json({
     status: 'success',
-    message: 'If that email exists, a reset link has been sent.',
+    message: 'If an account exists, a reset code has been sent.',
   });
+});
+
+export const verifyResetOtp = asyncHandler(async (req, res, next) => {
+  const { identifier, otp, newPassword } = req.body;
+  const normalizedEmail = normalizeEmail(identifier);
+  const normalizedPhone = normalizePhone(identifier);
+
+  const hashedOtp = crypto.createHash('sha256').update(otp).digest('hex');
+
+  const user = await User.findOne({
+    $or: [{ email: normalizedEmail }, { phone: normalizedPhone }],
+    passwordResetToken: hashedOtp,
+    passwordResetExpires: { $gt: new Date() },
+    isActive: true,
+  }).select('+password');
+
+  if (!user) {
+    return next(new AppError('Invalid or expired reset code.', 400));
+  }
+
+  user.password = newPassword;
+  user.passwordResetToken = undefined;
+  user.passwordResetExpires = undefined;
+  await user.save();
+
+  setCookieAndRespond(res, user, 200);
 });
 
 export const resetPassword = asyncHandler(async (req, res, next) => {
