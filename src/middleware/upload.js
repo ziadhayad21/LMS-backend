@@ -36,12 +36,6 @@ const fileFilter = (allowedTypes) => (_req, file, cb) => {
 
 // ─── Multer Instances ─────────────────────────────────────────────────────────
 
-const videoUpload = multer({
-  storage:    diskStorage('videos'),
-  limits:     { fileSize: FILE_LIMITS.VIDEO_MAX_BYTES },
-  fileFilter: fileFilter(ALLOWED_MIME_TYPES.VIDEO),
-}).single('video');
-
 const pdfUpload = multer({
   storage:    diskStorage('pdfs'),
   limits:     { fileSize: FILE_LIMITS.PDF_MAX_BYTES },
@@ -76,7 +70,7 @@ const wrapUpload = (uploadFn) => (req, res, next) => {
 const lessonUpload = multer({
   storage:    multer.diskStorage({
     destination: (_req, file, cb) => {
-      const folder = file.fieldname === 'video' ? 'videos' : 'lessons';
+      const folder = 'lessons';
       const targetDir = `uploads/${folder}`;
       fs.mkdirSync(targetDir, { recursive: true });
       cb(null, targetDir);
@@ -87,12 +81,9 @@ const lessonUpload = multer({
       cb(null, `${file.fieldname}-${unique}${ext}`);
     },
   }),
-  limits:     { fileSize: FILE_LIMITS.VIDEO_MAX_BYTES }, 
+  limits:     { fileSize: FILE_LIMITS.PDF_MAX_BYTES }, 
   fileFilter: (_req, file, cb) => {
-    if (file.fieldname === 'video') {
-      if (ALLOWED_MIME_TYPES.VIDEO.includes(file.mimetype)) cb(null, true);
-      else cb(new AppError('Invalid video type.', 400), false);
-    } else if (file.fieldname === 'pdf') {
+    if (file.fieldname === 'pdf') {
       if (ALLOWED_MIME_TYPES.PDF.includes(file.mimetype)) cb(null, true);
       else cb(new AppError('Invalid PDF type.', 400), false);
     } else {
@@ -100,11 +91,9 @@ const lessonUpload = multer({
     }
   }
 }).fields([
-  { name: 'video', maxCount: 1 },
   { name: 'pdf',   maxCount: 1 },
 ]);
 
-export const uploadVideo  = wrapUpload(videoUpload);
 export const uploadLessonFiles = wrapUpload(lessonUpload);
 export const uploadPDF    = wrapUpload(pdfUpload);
 export const uploadImage  = wrapUpload(imageUpload);

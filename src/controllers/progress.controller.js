@@ -87,7 +87,7 @@ export const getStudentProgress = asyncHandler(async (req, res) => {
 
   const courseFilter = req.user.role === 'admin' ? {} : { teacher: req.user.id };
   const teacherCourses = await Course.find(courseFilter)
-    .populate('lessons', 'title duration order videoFile')
+    .populate('lessons', 'title duration order videoUrl')
     .populate('exams', 'title passingScore')
     .lean();
 
@@ -134,7 +134,7 @@ export const getStudentProgress = asyncHandler(async (req, res) => {
 
       // Prefer actualWatchedSeconds (skip-aware) over legacy watchTimeSeconds
       const actualWatched = Number(watchRecord?.actualWatchedSeconds ?? watchRecord?.watchTimeSeconds ?? 0);
-      const totalDuration = Number(lesson.duration || lesson.videoFile?.duration || 0);
+      const totalDuration = Number(lesson.duration || 0);
 
       let watchPercent = 0;
       if (totalDuration > 0) {

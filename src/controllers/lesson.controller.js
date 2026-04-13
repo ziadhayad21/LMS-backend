@@ -1,10 +1,12 @@
 import fs from 'fs';
+import path from 'path';
 import Course from '../models/Course.model.js';
 import Lesson from '../models/Lesson.model.js';
 import Progress from '../models/Progress.model.js';
 import User from '../models/User.model.js';
 import { AppError, sendSuccess } from '../utils/apiResponse.js';
 import asyncHandler from '../utils/asyncHandler.js';
+import { resolveSafeUploadPath, assertFileExists, sendInlinePdf } from '../utils/files.js';
 
 const assertTeacherOwns = (course, user) => {
   if (user.role === 'admin') return;
@@ -95,6 +97,40 @@ export const getLesson = asyncHandler(async (req, res, next) => {
   sendSuccess(res, 200, { lesson });
 });
 
+// ─── GET /courses/:courseId/lessons/:id/pdf ───────────────────────────────────
+export const getLessonPdf = asyncHandler(async (req, res, next) => {
+  const lesson = await Lesson.findOne({
+    _id: req.params.id,
+    course: req.params.courseId,
+  }).select('pdfFile level isPublished course teacher');
+
+  if (!lesson) return next(new AppError('Lesson not found.', 404));
+
+  // Students: strict availability rules
+  if (req.user?.role === 'student') {
+    if (!lesson.isPublished) return next(new AppError('Lesson not found.', 404));
+    if (!req.user.level || lesson.level !== req.user.level) {
+      return next(new AppError('This lesson is not available for your academic level.', 403));
+    }
+  }
+
+  // Teachers: must own course (admins bypass)
+  if (req.user?.role === 'teacher') {
+    const course = await Course.findById(req.params.courseId);
+    if (!course) return next(new AppError('Course not found.', 404));
+    assertTeacherOwns(course, req.user);
+  }
+
+  if (!lesson.pdfFile?.path) {
+    return next(new AppError('No PDF is available for this lesson.', 404));
+  }
+
+  const absolutePath = resolveSafeUploadPath(lesson.pdfFile.path);
+  assertFileExists(absolutePath);
+
+  sendInlinePdf(res, absolutePath, lesson.pdfFile.originalName || path.basename(absolutePath));
+});
+
 // ─── POST /courses/:courseId/lessons ─────────────────────────────────────────
 export const createLesson = asyncHandler(async (req, res, next) => {
   const course = await Course.findById(req.params.courseId);
@@ -114,19 +150,10 @@ export const createLesson = asyncHandler(async (req, res, next) => {
     teacher: req.user.id,
   };
 
-  if (req.files?.video) {
-    const video = req.files.video[0];
-    lessonData.videoFile = {
-      filename: video.filename,
-      originalName: video.originalname,
-      path: video.path,
-      size: video.size,
-      mimetype: video.mimetype,
-    };
-  } else if (req.body.videoUrl) {
+  if (req.body.videoUrl) {
     lessonData.videoUrl = req.body.videoUrl;
   } else {
-    return next(new AppError('No video file or URL provided.', 400));
+    return next(new AppError('No video URL provided.', 400));
   }
 
   if (req.files?.pdf) {
@@ -164,23 +191,7 @@ export const updateLesson = asyncHandler(async (req, res, next) => {
     if (req.body[field] !== undefined) lesson[field] = req.body[field];
   });
 
-  if (req.files?.video) {
-    const video = req.files.video[0];
-    // Delete old video file if it exists
-    if (lesson.videoFile?.path) {
-      fs.unlink(lesson.videoFile.path, (err) => {
-        if (err) console.warn('Could not delete old video:', err.message);
-      });
-    }
-    lesson.videoFile = {
-      filename: video.filename,
-      originalName: video.originalname,
-      path: video.path,
-      size: video.size,
-      mimetype: video.mimetype,
-    };
-    lesson.videoUrl = null; // Clear URL if file is uploaded
-  } else if (req.body.videoUrl) {
+  if (req.body.videoUrl) {
     lesson.videoUrl = req.body.videoUrl;
     lesson.videoFile = undefined;
   }
@@ -214,12 +225,6 @@ export const deleteLesson = asyncHandler(async (req, res, next) => {
 
   const course = await Course.findById(req.params.courseId);
   assertTeacherOwns(course, req.user);
-
-  if (lesson.videoFile?.path) {
-    fs.unlink(lesson.videoFile.path, (err) => {
-      if (err) console.warn('Could not delete video file:', err.message);
-    });
-  }
 
   await Promise.all([
     lesson.deleteOne(),

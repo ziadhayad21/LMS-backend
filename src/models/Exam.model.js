@@ -68,7 +68,8 @@ const examSchema = new mongoose.Schema(
 
     timeLimit:      { type: Number, default: null, min: 1 }, // minutes
     passingScore:   { type: Number, default: 60, min: 0, max: 100 }, // percentage
-    maxAttempts:    { type: Number, default: 3 }, // -1 = unlimited
+    // Default to one attempt; teachers/admins can configure (including -1 = unlimited) when creating/updating.
+    maxAttempts:    { type: Number, default: 1 }, // -1 = unlimited
     shuffleQuestions: { type: Boolean, default: false },
     shuffleOptions:   { type: Boolean, default: false },
     showCorrectAnswers: { type: Boolean, default: true },

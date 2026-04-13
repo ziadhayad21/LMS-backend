@@ -5,6 +5,8 @@ import {
   logout,
   getMe,
   updatePassword,
+  forgotPassword,
+  resetPassword,
   listStudents,
   updateStudentStatus,
 } from '../controllers/auth.controller.js';
@@ -15,6 +17,8 @@ import {
   loginValidator,
   updatePasswordValidator,
   updateStudentStatusValidator,
+  forgotPasswordValidator,
+  resetPasswordValidator,
 } from '../validators/auth.validator.js';
 
 const router = Router();
@@ -24,6 +28,8 @@ router.post('/login',    loginValidator,    login);
 router.post('/logout',   authenticate,      logout);
 router.get( '/me',       authenticate,      getMe);
 router.patch('/update-password', authenticate, updatePasswordValidator, updatePassword);
+router.post('/forgot-password', forgotPasswordValidator, forgotPassword);
+router.patch('/reset-password/:token', resetPasswordValidator, resetPassword);
 router.get('/students', authenticate, authorize('teacher', 'admin'), listStudents);
 router.patch(
   '/students/:id/status',

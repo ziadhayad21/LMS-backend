@@ -53,7 +53,7 @@ const lessonSchema = new mongoose.Schema(
       },
       default: null,
     },
-    videoUrl: { type: String, default: null }, // External URL fallback
+    videoUrl: { type: String, default: null }, // Cloudinary URL
     order: {
       type:     Number,
       required: true,

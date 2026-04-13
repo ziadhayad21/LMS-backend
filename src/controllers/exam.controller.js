@@ -125,6 +125,16 @@ export const getExam = asyncHandler(async (req, res, next) => {
     exam: exam._id,
   });
 
+  // Enforce attempt limit for students: prevent entering after submission(s)
+  if (
+    req.user.role === 'student' &&
+    exam.maxAttempts !== -1 &&
+    typeof exam.maxAttempts === 'number' &&
+    attemptCount >= exam.maxAttempts
+  ) {
+    return next(new AppError('You have already used all allowed attempts for this exam.', 403));
+  }
+
   sendSuccess(res, 200, { exam, attemptCount });
 });
 
@@ -223,6 +233,15 @@ export const submitExam = asyncHandler(async (req, res, next) => {
     }
   }
 
+  // Enforce max attempts (configurable per exam)
+  const prevAttempts = await Result.countDocuments({
+    student: req.user.id,
+    exam: exam._id,
+  });
+  if (exam.maxAttempts !== -1 && typeof exam.maxAttempts === 'number' && prevAttempts >= exam.maxAttempts) {
+    return next(new AppError('You have already used all allowed attempts for this exam.', 403));
+  }
+
   // Grading
   let totalPoints = 0;
   let earnedPoints = 0;
@@ -263,11 +282,6 @@ export const submitExam = asyncHandler(async (req, res, next) => {
 
   const score = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
   const passed = score >= exam.passingScore;
-
-  const prevAttempts = await Result.countDocuments({
-    student: req.user.id,
-    exam: exam._id,
-  });
 
   const result = await Result.create({
     student: req.user.id,

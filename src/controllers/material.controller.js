@@ -4,6 +4,7 @@ import Material from '../models/Material.model.js';
 import Progress from '../models/Progress.model.js';
 import { AppError, sendSuccess } from '../utils/apiResponse.js';
 import asyncHandler from '../utils/asyncHandler.js';
+import { resolveSafeUploadPath, assertFileExists, sendInlinePdf } from '../utils/files.js';
 
 const assertTeacherOwns = (course, user) => {
   if (user.role === 'admin') return;
@@ -72,7 +73,20 @@ export const downloadMaterial = asyncHandler(async (req, res, next) => {
     _id: req.params.id,
     course: req.params.courseId,
   });
-  if (!material || !material.isPublished) return next(new AppError('Material not found.', 404));
+  if (!material) return next(new AppError('Material not found.', 404));
+
+  // Published gating:
+  // - students: only published
+  // - teacher/admin: allow access (teacher must own the course)
+  if (!material.isPublished && req.user.role === 'student') {
+    return next(new AppError('Material not found.', 404));
+  }
+
+  if (req.user.role === 'teacher') {
+    const course = await Course.findById(req.params.courseId);
+    if (!course) return next(new AppError('Course not found.', 404));
+    assertTeacherOwns(course, req.user);
+  }
 
   if (req.user.role === 'student') {
     // STRICT: Check the course level matches the student's level
@@ -90,7 +104,9 @@ export const downloadMaterial = asyncHandler(async (req, res, next) => {
 
   await Material.findByIdAndUpdate(material._id, { $inc: { downloadCount: 1 } });
 
-  res.download(material.file.path, material.file.originalName);
+  const absolutePath = resolveSafeUploadPath(material.file.path);
+  assertFileExists(absolutePath);
+  sendInlinePdf(res, absolutePath, material.file.originalName);
 });
 
 // ─── DELETE /courses/:courseId/materials/:id ─────────────────────────────────

@@ -71,3 +71,20 @@ export const updateStudentStatusValidator = [
     .isIn(['pending', 'active']).withMessage('Status must be "pending" or "active"'),
   validate,
 ];
+
+export const forgotPasswordValidator = [
+  body('email')
+    .trim()
+    .isEmail().withMessage('Please provide a valid email address')
+    .normalizeEmail(),
+  validate,
+];
+
+export const resetPasswordValidator = [
+  body('newPassword')
+    .isLength({ min: 8 }).withMessage('New password must be at least 8 characters')
+    .matches(/[A-Z]/).withMessage('New password must contain an uppercase letter')
+    .matches(/[a-z]/).withMessage('New password must contain a lowercase letter')
+    .matches(/\d/).withMessage('New password must contain a number'),
+  validate,
+];

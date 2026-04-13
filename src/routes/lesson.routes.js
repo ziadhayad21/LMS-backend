@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   getLessons,
   getLesson,
+  getLessonPdf,
   createLesson,
   updateLesson,
   deleteLesson,
@@ -20,6 +21,7 @@ router.use(authenticate);
 
 router.get('/',    requireActiveStudent, getLessons);
 router.get('/:id', requireActiveStudent, getLesson);
+router.get('/:id/pdf', requireActiveStudent, getLessonPdf);
 
 router.post('/',    authorize('teacher'), uploadLessonFiles, createLessonValidator, createLesson);
 router.patch('/:id', authorize('teacher'), uploadLessonFiles, updateLesson);

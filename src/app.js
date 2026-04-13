@@ -73,7 +73,8 @@ app.use(
     maxAge: '1d',
     setHeaders(res, filePath) {
       if (filePath.endsWith('.pdf')) {
-        res.set('Content-Disposition', 'attachment');
+        res.set('Content-Disposition', 'inline');
+        res.set('Content-Type', 'application/pdf');
       }
     },
   })

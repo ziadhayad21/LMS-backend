@@ -108,7 +108,7 @@ export const getCourse = asyncHandler(async (req, res, next) => {
 
   const course = await Course.findOne(query)
     .populate('teacher', 'name avatarUrl')
-    .populate({ path: 'lessons', match: lessonMatch, select: '-videoFile.path' })
+    .populate({ path: 'lessons', match: lessonMatch, select: 'title description level order isPreview isPublished videoUrl pdfFile transcriptText createdAt updatedAt' })
     .populate({ path: 'materials', match: { isPublished: true } })
     .populate({ path: 'exams', match: examMatch, select: 'title description timeLimit passingScore maxAttempts' });
 
