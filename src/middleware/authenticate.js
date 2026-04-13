@@ -52,3 +52,28 @@ export const authenticate = asyncHandler(async (req, _res, next) => {
   req.user = currentUser;
   next();
 });
+
+/**
+ * Optional authentication: attempts to populate req.user but never blocks the request.
+ * Useful for public routes that have different visibility for logged-in users.
+ */
+export const authenticateOptional = asyncHandler(async (req, _res, next) => {
+  let token;
+  if (req.cookies?.jwt && req.cookies.jwt !== 'loggedout') {
+    token = req.cookies.jwt;
+  }
+
+  if (!token) return next();
+
+  try {
+    const decoded = verifyToken(token);
+    const currentUser = await User.findById(decoded.id);
+    if (currentUser && currentUser.isActive) {
+      req.user = currentUser;
+    }
+  } catch (err) {
+    // Silently ignore invalid tokens in optional mode
+  }
+
+  next();
+});
