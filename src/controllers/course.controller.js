@@ -153,7 +153,7 @@ export const deleteCourse = asyncHandler(async (req, res, next) => {
   assertTeacherOwns(course, req.user);
 
   await course.deleteOne();
-  sendSuccess(res, 204, {});
+  sendSuccess(res, 200, { message: 'Course deleted successfully' });
 });
 
 // ─── POST /courses/:id/enroll ────────────────────────────────────────────────
