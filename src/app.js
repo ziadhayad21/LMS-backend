@@ -20,10 +20,11 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc:  ["'self'"],
-        styleSrc:   ["'self'", "'unsafe-inline'"],
-        imgSrc:     ["'self'", 'data:', 'blob:'],
-        mediaSrc:   ["'self'", 'blob:'],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'blob:', 'https://*.up.railway.app'],
+        mediaSrc: ["'self'", 'blob:', 'data:', '*', 'https://*.up.railway.app'],
+        connectSrc: ["'self'", 'https://*.up.railway.app'],
       },
     },
   })

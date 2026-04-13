@@ -33,8 +33,8 @@ export const getExams = asyncHandler(async (req, res, next) => {
   // Students: select only safe fields; teachers/admins: include question count
   const select =
     req.user.role === 'teacher' || req.user.role === 'admin'
-      ? 'title description timeLimit passingScore maxAttempts isPublished createdAt questions'
-      : 'title description timeLimit passingScore maxAttempts';
+      ? 'title description timeLimit passingScore maxAttempts isPublished level createdAt questions'
+      : 'title description timeLimit passingScore maxAttempts level';
 
   const exams = await Exam.find(filter).select(select).lean();
 
