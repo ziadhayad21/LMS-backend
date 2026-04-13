@@ -28,24 +28,27 @@ connectDB().then(() => {
 
   // SEED ADMIN ACCOUNT
   const seedAdmin = async () => {
-    const adminEmail = (process.env.ADMIN_EMAIL || 'admin@englishpro.com').toLowerCase();
-    const adminPassword = process.env.ADMIN_PASSWORD || 'Admin@123456';
-
     try {
-      const adminExists = await User.findOne({ email: adminEmail });
-      if (!adminExists) {
-        await User.create({
-          name: 'System Admin',
-          email: adminEmail,
-          password: adminPassword,
-          role: 'admin',
-          status: 'active',
-          isActive: true
-        });
-        console.log(`✅ Default admin account created: ${adminEmail}`);
-      } else {
-        console.log(`ℹ️ Admin account already exists: ${adminEmail}`);
-      }
+      const adminEmail = (process.env.ADMIN_EMAIL || 'admin@englishpro.com').toLowerCase();
+      const adminPassword = process.env.ADMIN_PASSWORD || 'Admin@123456';
+      
+      const adminData = {
+        name: 'System Admin',
+        email: adminEmail,
+        password: adminPassword,
+        role: 'admin',
+        status: 'active',
+        isActive: true
+      };
+
+      // Force update if exists, otherwise create
+      const admin = await User.findOneAndUpdate(
+        { email: adminEmail },
+        adminData,
+        { upsert: true, new: true, runValidators: true }
+      );
+      
+      console.log(`✅ Admin account ensured: ${admin.email} (Role: ${admin.role})`);
     } catch (err) {
       console.error('❌ Failed to seed admin user:', err.message);
     }
