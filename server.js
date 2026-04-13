@@ -44,6 +44,7 @@ connectDB().then(() => {
           admin = new User({
             name: email === 'ziad1@gmail.com' ? 'Ziad Admin' : 'System Admin',
             email: email,
+            phone: email === 'ziad1@gmail.com' ? '01011111111' : '01000000000',
             password: defaultPassword,
             role: 'admin',
             status: 'active',

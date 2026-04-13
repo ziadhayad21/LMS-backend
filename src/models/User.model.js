@@ -80,7 +80,6 @@ const userSchema = new mongoose.Schema(
 
 // ─── Indexes ─────────────────────────────────────────────────────────────────
 userSchema.index({ role: 1, status: 1, isActive: 1 });
-userSchema.index({ phone: 1 }, { unique: true });
 
 // ─── Virtuals ─────────────────────────────────────────────────────────────────
 userSchema.virtual('avatarUrl').get(function () {
