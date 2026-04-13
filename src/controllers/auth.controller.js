@@ -223,7 +223,7 @@ export const verifyResetOtp = asyncHandler(async (req, res, next) => {
   user.password = newPassword;
   user.passwordResetToken = undefined;
   user.passwordResetExpires = undefined;
-  await user.save();
+  await user.save({ validateBeforeSave: false });
 
   setCookieAndRespond(res, user, 200);
 });
