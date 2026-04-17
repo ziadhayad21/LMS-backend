@@ -102,15 +102,17 @@ export const getLessonPdf = asyncHandler(async (req, res, next) => {
   const lesson = await Lesson.findOne({
     _id: req.params.id,
     course: req.params.courseId,
-  }).select('pdfFile level isPublished course teacher');
+  }).select('pdfFile title level isPublished course teacher');
 
-  if (!lesson) return next(new AppError('Lesson not found.', 404));
+  if (!lesson) {
+    return next(new AppError(`Lesson not found (ID: ${req.params.id})`, 404));
+  }
 
   // Students: strict availability rules
   if (req.user?.role === 'student') {
-    if (!lesson.isPublished) return next(new AppError('Lesson not found.', 404));
+    if (!lesson.isPublished) return next(new AppError('This lesson is not yet published.', 404));
     if (!req.user.level || lesson.level !== req.user.level) {
-      return next(new AppError('This lesson is not available for your academic level.', 403));
+      return next(new AppError(`Access denied. Your level (${req.user.level}) does not match the lesson level (${lesson.level}).`, 403));
     }
   }
 
@@ -122,26 +124,30 @@ export const getLessonPdf = asyncHandler(async (req, res, next) => {
   }
 
   if (!lesson.pdfFile?.path) {
-    return next(new AppError('No PDF is available for this lesson.', 404));
+    return next(new AppError('No PDF file is associated with this lesson.', 404));
   }
 
-  const absolutePath = resolveSafeUploadPath(lesson.pdfFile.path);
-  assertFileExists(absolutePath);
+  try {
+    const absolutePath = resolveSafeUploadPath(lesson.pdfFile.path);
+    assertFileExists(absolutePath);
 
-  // The PDF viewer does a HEAD request to validate access.
-  // Do not stream the file for HEAD requests.
-  if (req.method === 'HEAD') {
-    const filename = lesson.pdfFile.originalName || path.basename(absolutePath) || 'file.pdf';
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader(
-      'Content-Disposition',
-      `inline; filename="${String(filename).replace(/"/g, '')}"`
-    );
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    return res.status(200).end();
+    const filename = lesson.pdfFile.originalName || `${lesson.title.replace(/[^a-z0-9]/gi, '_')}.pdf`;
+
+    if (req.method === 'HEAD') {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${String(filename).replace(/"/g, '')}"`);
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      return res.status(200).end();
+    }
+
+    return sendInlinePdf(res, absolutePath, filename);
+  } catch (err) {
+    // If it's a file not found on disk error
+    if (err.statusCode === 404) {
+      return next(new AppError(`The PDF file exists in the database but was not found on the server's disk storage. This can happen if the server was restarted without persistent storage. Path: ${lesson.pdfFile.path}`, 404));
+    }
+    throw err;
   }
-
-  return sendInlinePdf(res, absolutePath, lesson.pdfFile.originalName || path.basename(absolutePath));
 });
 
 // ─── POST /courses/:courseId/lessons ─────────────────────────────────────────
