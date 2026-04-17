@@ -128,7 +128,20 @@ export const getLessonPdf = asyncHandler(async (req, res, next) => {
   const absolutePath = resolveSafeUploadPath(lesson.pdfFile.path);
   assertFileExists(absolutePath);
 
-  sendInlinePdf(res, absolutePath, lesson.pdfFile.originalName || path.basename(absolutePath));
+  // The PDF viewer does a HEAD request to validate access.
+  // Do not stream the file for HEAD requests.
+  if (req.method === 'HEAD') {
+    const filename = lesson.pdfFile.originalName || path.basename(absolutePath) || 'file.pdf';
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="${String(filename).replace(/"/g, '')}"`
+    );
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    return res.status(200).end();
+  }
+
+  return sendInlinePdf(res, absolutePath, lesson.pdfFile.originalName || path.basename(absolutePath));
 });
 
 // ─── POST /courses/:courseId/lessons ─────────────────────────────────────────

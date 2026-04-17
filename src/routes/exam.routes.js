@@ -18,11 +18,11 @@ router.use(authenticate);
 
 router.get('/',        getExams);
 router.get('/:id',     getExam);
-router.get('/:id/full', authorize('teacher'), getExamFull);
+router.get('/:id/full', authorize('teacher', 'admin'), getExamFull);
 
-router.post('/',       authorize('teacher'), createExamValidator, createExam);
-router.patch('/:id',   authorize('teacher'), updateExam);
-router.delete('/:id',  authorize('teacher'), deleteExam);
+router.post('/',       authorize('teacher', 'admin'), createExamValidator, createExam);
+router.patch('/:id',   authorize('teacher', 'admin'), updateExam);
+router.delete('/:id',  authorize('teacher', 'admin'), deleteExam);
 
 router.post('/:examId/submit', authorize('student'), submitExamValidator, submitExam);
 

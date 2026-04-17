@@ -33,8 +33,8 @@ export const getExams = asyncHandler(async (req, res, next) => {
   // Students: select only safe fields; teachers/admins: include question count
   const select =
     req.user.role === 'teacher' || req.user.role === 'admin'
-      ? 'title description timeLimit passingScore maxAttempts isPublished level createdAt questions'
-      : 'title description timeLimit passingScore maxAttempts level';
+      ? 'title description timeLimit passingScore maxAttempts isPublished level createdAt questions availableFrom availableUntil'
+      : 'title description timeLimit passingScore maxAttempts level availableFrom availableUntil';
 
   const exams = await Exam.find(filter).select(select).lean();
 
@@ -69,8 +69,8 @@ export const getGlobalExams = asyncHandler(async (req, res) => {
   // Students: select only safe fields; teachers/admins: include question count
   const select =
     req.user.role === 'student'
-      ? 'title description course level timeLimit passingScore maxAttempts'
-      : 'title description course level timeLimit passingScore maxAttempts isPublished createdAt questions';
+      ? 'title description course level timeLimit passingScore maxAttempts availableFrom availableUntil'
+      : 'title description course level timeLimit passingScore maxAttempts isPublished createdAt questions availableFrom availableUntil';
 
   const exams = await Exam.find(filter).select(select).populate('course', 'title').lean();
 
@@ -101,13 +101,15 @@ export const getExam = asyncHandler(async (req, res, next) => {
     }
   }
 
-  // Check availability window
+  // Availability window is enforced for students only.
   const now = new Date();
-  if (exam.availableFrom && now < exam.availableFrom) {
-    return next(new AppError('This exam is not available yet.', 403));
-  }
-  if (exam.availableUntil && now > exam.availableUntil) {
-    return next(new AppError('This exam has expired.', 403));
+  if (req.user.role === 'student') {
+    if (exam.availableFrom && now < exam.availableFrom) {
+      return next(new AppError('This exam is not available yet.', 403));
+    }
+    if (exam.availableUntil && now > exam.availableUntil) {
+      return next(new AppError('This exam has expired.', 403));
+    }
   }
 
   // Strip correct answers for students
@@ -136,6 +138,41 @@ export const getExam = asyncHandler(async (req, res, next) => {
   }
 
   sendSuccess(res, 200, { exam, attemptCount });
+});
+
+// ─── PATCH /exams/:id  (GLOBAL) ───────────────────────────────────────────────
+export const updateGlobalExam = asyncHandler(async (req, res, next) => {
+  const exam = await Exam.findById(req.params.id);
+  if (!exam) return next(new AppError('Exam not found.', 404));
+
+  // Teachers can only edit their own exams (admins can edit all)
+  if (req.user.role === 'teacher' && String(exam.teacher) !== String(req.user.id)) {
+    return next(new AppError('You are not allowed to edit this exam.', 403));
+  }
+
+  const updates = { ...req.body };
+  delete updates.teacher;
+  delete updates.course;
+
+  const updated = await Exam.findByIdAndUpdate(req.params.id, updates, {
+    new: true,
+    runValidators: true,
+  });
+
+  sendSuccess(res, 200, { exam: updated });
+});
+
+// ─── DELETE /exams/:id  (GLOBAL) ──────────────────────────────────────────────
+export const deleteGlobalExam = asyncHandler(async (req, res, next) => {
+  const exam = await Exam.findById(req.params.id);
+  if (!exam) return next(new AppError('Exam not found.', 404));
+
+  if (req.user.role === 'teacher' && String(exam.teacher) !== String(req.user.id)) {
+    return next(new AppError('You are not allowed to delete this exam.', 403));
+  }
+
+  await exam.deleteOne();
+  sendSuccess(res, 204, {});
 });
 
 // ─── GET /courses/:courseId/exams/:id/full  (teacher — with answers) ──────────
@@ -225,6 +262,15 @@ export const submitExam = asyncHandler(async (req, res, next) => {
   }).lean();
 
   if (!exam) return next(new AppError('Exam not found or not available.', 404));
+
+  // Enforce availability window on submission as well (auto-close after end time)
+  const now = new Date();
+  if (exam.availableFrom && now < new Date(exam.availableFrom)) {
+    return next(new AppError('This exam is not available yet.', 403));
+  }
+  if (exam.availableUntil && now > new Date(exam.availableUntil)) {
+    return next(new AppError('This exam window has closed.', 403));
+  }
 
   // STRICT: Students can only submit exams that match their academic level
   if (req.user.role === 'student') {

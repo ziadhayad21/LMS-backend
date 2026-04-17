@@ -23,9 +23,9 @@ router.get('/',    requireActiveStudent, getLessons);
 router.get('/:id', requireActiveStudent, getLesson);
 router.get('/:id/pdf', requireActiveStudent, getLessonPdf);
 
-router.post('/',    authorize('teacher'), uploadLessonFiles, createLessonValidator, createLesson);
-router.patch('/:id', authorize('teacher'), uploadLessonFiles, updateLesson);
-router.delete('/:id', authorize('teacher'), deleteLesson);
+router.post('/',    authorize('teacher', 'admin'), uploadLessonFiles, createLessonValidator, createLesson);
+router.patch('/:id', authorize('teacher', 'admin'), uploadLessonFiles, updateLesson);
+router.delete('/:id', authorize('teacher', 'admin'), deleteLesson);
 
 router.post('/:id/complete', authorize('student'), requireActiveStudent, completeLesson);
 

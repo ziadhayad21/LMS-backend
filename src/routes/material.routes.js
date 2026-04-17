@@ -15,7 +15,7 @@ router.use(authenticate);
 
 router.get('/',                           getMaterials);
 router.get('/:id/download',              downloadMaterial);
-router.post('/',   authorize('teacher'), uploadPDF, uploadMaterial);
-router.delete('/:id', authorize('teacher'), deleteMaterial);
+router.post('/',   authorize('teacher', 'admin'), uploadPDF, uploadMaterial);
+router.delete('/:id', authorize('teacher', 'admin'), deleteMaterial);
 
 export default router;

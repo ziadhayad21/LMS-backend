@@ -102,11 +102,23 @@ export const downloadMaterial = asyncHandler(async (req, res, next) => {
     );
   }
 
-  await Material.findByIdAndUpdate(material._id, { $inc: { downloadCount: 1 } });
-
   const absolutePath = resolveSafeUploadPath(material.file.path);
   assertFileExists(absolutePath);
-  sendInlinePdf(res, absolutePath, material.file.originalName);
+
+  // The PDF viewer does a HEAD request to validate access.
+  // We must not count it as a "download" and must not stream the whole file.
+  if (req.method === 'HEAD') {
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="${String(material.file.originalName || 'file.pdf').replace(/"/g, '')}"`
+    );
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    return res.status(200).end();
+  }
+
+  await Material.findByIdAndUpdate(material._id, { $inc: { downloadCount: 1 } });
+  return sendInlinePdf(res, absolutePath, material.file.originalName);
 });
 
 // ─── DELETE /courses/:courseId/materials/:id ─────────────────────────────────

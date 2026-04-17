@@ -48,6 +48,14 @@ export const createExamValidator = [
     .optional()
     .isInt({ min: -1 }).withMessage('maxAttempts must be -1 (unlimited) or a positive integer'),
 
+  body('availableFrom')
+    .optional({ nullable: true })
+    .isISO8601().withMessage('availableFrom must be a valid ISO 8601 date-time'),
+
+  body('availableUntil')
+    .optional({ nullable: true })
+    .isISO8601().withMessage('availableUntil must be a valid ISO 8601 date-time'),
+
   validate,
 ];
 
