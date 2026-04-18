@@ -112,6 +112,16 @@ export const updateStudentStatus = asyncHandler(async (req, res, next) => {
   });
 });
 
+export const deleteStudent = asyncHandler(async (req, res, next) => {
+  const student = await User.findOneAndDelete({ _id: req.params.id, role: 'student' });
+  if (!student) return next(new AppError('Student not found.', 404));
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Student deleted successfully.',
+  });
+});
+
 // ─── Update Password ──────────────────────────────────────────────────────────
 export const updatePassword = asyncHandler(async (req, res, next) => {
   const { currentPassword, newPassword } = req.body;

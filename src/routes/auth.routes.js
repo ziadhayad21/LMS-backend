@@ -10,6 +10,7 @@ import {
   verifyResetOtp,
   listStudents,
   updateStudentStatus,
+  deleteStudent,
 } from '../controllers/auth.controller.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { authorize } from '../middleware/authorize.js';
@@ -41,5 +42,6 @@ router.patch(
   updateStudentStatusValidator,
   updateStudentStatus
 );
+router.delete('/students/:id', authenticate, authorize('teacher', 'admin'), deleteStudent);
 
 export default router;
